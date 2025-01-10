@@ -13,7 +13,6 @@ import ReactFlow, {
   ReactFlowProvider,
   addEdge,
   MarkerType,
-  NodeProps,
   Position,
   Handle
 } from 'reactflow';
@@ -29,7 +28,7 @@ const nodeTypes = {
   task: TaskNode,
   agent: AgentNode,
   begin: BeginNode,
-  reroute: ({ data }: NodeProps) => (
+  reroute: () => (
     <div style={{ width: 10, height: 10, backgroundColor: 'gray', borderRadius: '50%', position: 'relative' }}>
       <Handle type="target" position={Position.Left} style={{ background: 'white', borderRadius: '50%', width: 6, height: 6, top: '50%', transform: 'translateY(-50%)' }} />
       <Handle type="source" position={Position.Right} style={{ background: 'white', borderRadius: '50%', width: 6, height: 6, top: '50%', transform: 'translateY(-50%)' }} />
@@ -49,10 +48,7 @@ function Flow() {
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       setNodes((nds) => applyNodeChanges(changes, nds));
-      const selectedNode = changes.find(change => change.selected);
-      if (selectedNode) {
-        setSelectedNodeId(selectedNode.id);
-      }
+      // Implement a different approach to track selected nodes
     },
     []
   );
@@ -279,8 +275,8 @@ function Flow() {
             onDrop={onDrop}
             onPaneClick={onPaneClick}
             onPaneContextMenu={onPaneContextMenu}
-            onPaneMouseDown={onPaneMouseDown}
-            onPaneMouseUp={onPaneMouseUp}
+            onMouseDown={onPaneMouseDown}
+            onMouseUp={onPaneMouseUp}
             onEdgeDoubleClick={onEdgeDoubleClick}
             nodeTypes={nodeTypes}
             fitView

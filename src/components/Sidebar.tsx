@@ -1,5 +1,4 @@
 import { Box, Paper, Typography, Divider } from '@mui/material';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import PersonIcon from '@mui/icons-material/Person';
 import StartIcon from '@mui/icons-material/Start';

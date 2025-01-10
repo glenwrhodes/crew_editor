@@ -1,8 +1,8 @@
 import { memo, useState } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { Handle, Position } from 'reactflow';
 import { Card, CardContent, Typography } from '@mui/material';
 
-const BeginNode = ({ data }: NodeProps) => {
+const BeginNode = () => {
   const [isSelected, setIsSelected] = useState(false);
 
   const handleSelect = () => {
@@ -22,7 +22,7 @@ const BeginNode = ({ data }: NodeProps) => {
       onClick={handleSelect}
     >
       <CardContent>
-        <Typography variant="h8" component="div">
+        <Typography variant="body1" component="div">
           Begin
         </Typography>
         <Handle type="source" position={Position.Right} id="exec-out" style={{ background: 'white', borderRadius: '50%', width: 14, height: 14, border: '2px solid #555', top: '50%', transform: 'translateY(-50%)' }} />
