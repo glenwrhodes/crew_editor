@@ -54,6 +54,7 @@ const AgentNode = ({ data, onSave, updateSavedAgents }: NodeProps<AgentData> & {
           value={data.name || ''}
           onChange={(e) => data.onChange?.('name', e.target.value)}
           sx={{ mt: 1 }}
+          onMouseDown={(e) => e.stopPropagation()}
         />
 
         <TextField
@@ -66,6 +67,7 @@ const AgentNode = ({ data, onSave, updateSavedAgents }: NodeProps<AgentData> & {
           value={data.role || ''}
           onChange={(e) => data.onChange?.('role', e.target.value)}
           sx={{ mt: 1 }}
+          onMouseDown={(e) => e.stopPropagation()}
         />
 
         <TextField
@@ -78,6 +80,7 @@ const AgentNode = ({ data, onSave, updateSavedAgents }: NodeProps<AgentData> & {
           value={data.goal || ''}
           onChange={(e) => data.onChange?.('goal', e.target.value)}
           sx={{ mt: 1 }}
+          onMouseDown={(e) => e.stopPropagation()}
         />
 
         <TextField
@@ -90,6 +93,7 @@ const AgentNode = ({ data, onSave, updateSavedAgents }: NodeProps<AgentData> & {
           value={data.backstory || ''}
           onChange={(e) => data.onChange?.('backstory', e.target.value)}
           sx={{ mt: 1 }}
+          onMouseDown={(e) => e.stopPropagation()}
         />
 
         <TextField
@@ -101,6 +105,7 @@ const AgentNode = ({ data, onSave, updateSavedAgents }: NodeProps<AgentData> & {
           value={data.tools || ''}
           onChange={(e) => data.onChange?.('tools', e.target.value)}
           sx={{ mt: 1 }}
+          onMouseDown={(e) => e.stopPropagation()}
         />
 
         <Box sx={{ position: 'absolute', top: '50%', right: -7, transform: 'translateY(-50%)' }}>

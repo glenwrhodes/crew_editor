@@ -52,6 +52,7 @@ const TaskNode = ({ data, onSave, updateSavedTasks }: NodeProps<TaskData> & { on
           value={data.name || ''}
           onChange={(e) => data.onChange?.('name', e.target.value)}
           sx={{ mt: 1 }}
+          onMouseDown={(e) => e.stopPropagation()}
         />
 
         <TextField
@@ -64,6 +65,7 @@ const TaskNode = ({ data, onSave, updateSavedTasks }: NodeProps<TaskData> & { on
           value={data.description || ''}
           onChange={(e) => data.onChange?.('description', e.target.value)}
           sx={{ mt: 1 }}
+          onMouseDown={(e) => e.stopPropagation()}
         />
 
         <TextField
@@ -76,6 +78,7 @@ const TaskNode = ({ data, onSave, updateSavedTasks }: NodeProps<TaskData> & { on
           value={data.expected_output || ''}
           onChange={(e) => data.onChange?.('expected_output', e.target.value)}
           sx={{ mt: 1 }}
+          onMouseDown={(e) => e.stopPropagation()}
         />
 
         <Box sx={{ position: 'absolute', top: '50%', left: 0, transform: 'translateY(-50%)' }}>

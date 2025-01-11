@@ -1,4 +1,4 @@
-import { useState, useCallback, DragEvent, useEffect } from 'react';
+import { useState, useCallback, DragEvent, useEffect, useMemo } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -60,12 +60,12 @@ function Flow() {
   const [savedAgents, setSavedAgents] = useState<Agent[]>([]);
   const [savedTasks, setSavedTasks] = useState<Task[]>([]);
 
-  const nodeTypes = {
+  const nodeTypes = useMemo(() => ({
     task: (props: NodeProps<TaskData>) => <TaskNode {...props} onSave={() => {}} updateSavedTasks={(tasks) => setSavedTasks(tasks as Task[])} />,
     agent: (props: NodeProps<AgentData>) => <AgentNode {...props} onSave={() => {}} updateSavedAgents={(agents) => setSavedAgents(agents as Agent[])} />,
     begin: BeginNode,
     reroute: RerouteNode,
-  };
+  }), [setSavedTasks, setSavedAgents]);
 
   useEffect(() => {
     const saved = localStorage.getItem('savedGraphs');
