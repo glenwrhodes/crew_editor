@@ -96,6 +96,11 @@ const Sidebar = ({ savedAgents, savedTasks, setSavedAgents, setSavedTasks }: { s
         maxHeight: '100vh'
       }}
     >
+      <Typography variant="h6">Nodes</Typography>
+      <DraggableNode type="begin" label="Begin Node" icon={<StartIcon />} savedAgents={savedAgents} savedTasks={savedTasks} />
+      <DraggableNode type="agent" label="Agent Node" icon={<PersonIcon />} savedAgents={savedAgents} savedTasks={savedTasks} />
+      <DraggableNode type="task" label="Task Node" icon={<AssignmentIcon />} savedAgents={savedAgents} savedTasks={savedTasks} />
+      <Divider sx={{ my: 2 }} />
       <Typography variant="h6">Saved Agents</Typography>
       {savedAgents.map((agent, index) => (
         <Box key={index} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px dashed grey', borderRadius: 1, p: 2, mb: 1, cursor: 'grab' }} draggable onDragStart={(event) => onDragStart(event, 'agent', agent.name)}>
@@ -121,33 +126,6 @@ const Sidebar = ({ savedAgents, savedTasks, setSavedAgents, setSavedTasks }: { s
           </IconButton>
         </Box>
       ))}
-      <Divider sx={{ my: 2 }} />
-      <Typography variant="h6">Nodes</Typography>
-      <Divider />
-      <DraggableNode 
-        type="begin" 
-        label="Begin Node" 
-        icon={<StartIcon color="action" />} 
-        savedAgents={savedAgents} 
-        savedTasks={savedTasks} 
-      />
-
-      <DraggableNode 
-        type="agent" 
-        label="Agent Node" 
-        icon={<PersonIcon color="primary" />} 
-        savedAgents={savedAgents} 
-        savedTasks={savedTasks} 
-      />
-
-      <DraggableNode 
-        type="task" 
-        label="Task Node" 
-        icon={<AssignmentIcon color="secondary" />} 
-        savedAgents={savedAgents} 
-        savedTasks={savedTasks} 
-      />
-
     </Paper>
   );
 };
