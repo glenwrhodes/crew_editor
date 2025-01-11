@@ -90,7 +90,7 @@ const Sidebar = ({ savedAgents, savedTasks, setSavedAgents, setSavedTasks }: { s
   return (
     <Paper 
       sx={{ 
-        width: 200, 
+        width: 250, 
         p: 2,
         overflowY: 'auto',
         maxHeight: '100vh'
