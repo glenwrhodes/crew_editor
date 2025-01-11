@@ -1,8 +1,9 @@
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Card, CardContent, Typography, TextField, Box } from '@mui/material';
+import { Card, CardContent, Typography, TextField, Box, IconButton } from '@mui/material';
+import SaveIcon from '@mui/icons-material/Save';
 
-interface AgentData {
+export interface AgentData {
   name?: string;
   role?: string;
   goal?: string;
@@ -11,11 +12,21 @@ interface AgentData {
   onChange?: (field: string, value: string) => void;
 }
 
-const AgentNode = ({ data }: NodeProps<AgentData>) => {
+const AgentNode = ({ data, onSave, updateSavedAgents }: NodeProps<AgentData> & { onSave: (agent: AgentData) => void, updateSavedAgents: (agents: AgentData[]) => void }) => {
   const [isSelected, setIsSelected] = useState(false);
 
   const handleSelect = () => {
     setIsSelected(!isSelected);
+  };
+
+  const handleSave = () => {
+    console.log('Saving Agent Data:', data);
+    const savedAgents = JSON.parse(localStorage.getItem('savedAgents') || '[]');
+    savedAgents.push(data);
+    localStorage.setItem('savedAgents', JSON.stringify(savedAgents));
+    console.log('Stored Agents in localStorage:', JSON.parse(localStorage.getItem('savedAgents') || '[]'));
+    updateSavedAgents(savedAgents);
+    onSave(data);
   };
 
   return (
@@ -99,6 +110,12 @@ const AgentNode = ({ data }: NodeProps<AgentData>) => {
             id="agent-out"
             style={{ background: 'yellow', borderRadius: '50%', width: 14, height: 14, border: '2px solid #555' }}
           />
+        </Box>
+
+        <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
+          <IconButton onClick={handleSave} size="small" color="primary">
+            <SaveIcon />
+          </IconButton>
         </Box>
       </CardContent>
     </Card>

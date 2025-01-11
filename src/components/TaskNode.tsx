@@ -1,19 +1,30 @@
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Card, CardContent, Typography, TextField, Box } from '@mui/material';
+import { Card, CardContent, Typography, TextField, Box, IconButton } from '@mui/material';
+import SaveIcon from '@mui/icons-material/Save';
 
-interface TaskData {
+export interface TaskData {
   name?: string;
   description?: string;
   expected_output?: string;
   onChange?: (field: string, value: string) => void;
 }
 
-const TaskNode = ({ data }: NodeProps<TaskData>) => {
+const TaskNode = ({ data, onSave, updateSavedTasks }: NodeProps<TaskData> & { onSave: (task: TaskData) => void, updateSavedTasks: (tasks: TaskData[]) => void }) => {
   const [isSelected, setIsSelected] = useState(false);
 
   const handleSelect = () => {
     setIsSelected(!isSelected);
+  };
+
+  const handleSave = () => {
+    console.log('Saving Task Data:', data);
+    const savedTasks = JSON.parse(localStorage.getItem('savedTasks') || '[]');
+    savedTasks.push(data);
+    localStorage.setItem('savedTasks', JSON.stringify(savedTasks));
+    console.log('Stored Tasks in localStorage:', JSON.parse(localStorage.getItem('savedTasks') || '[]'));
+    updateSavedTasks(savedTasks);
+    onSave(data);
   };
 
   return (
@@ -90,6 +101,12 @@ const TaskNode = ({ data }: NodeProps<TaskData>) => {
             id="agent"
             style={{ background: 'yellow', borderRadius: '50%', width: 14, height: 14, border: '2px solid #555' }}
           />
+        </Box>
+
+        <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
+          <IconButton onClick={handleSave} size="small" color="primary">
+            <SaveIcon />
+          </IconButton>
         </Box>
       </CardContent>
     </Card>

@@ -14,26 +14,32 @@ import ReactFlow, {
   addEdge,
   MarkerType,
   Position,
+  NodeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { AppBar, Toolbar, Typography, Button, Box, ThemeProvider, createTheme, CssBaseline, Dialog, DialogTitle, DialogContent, TextField, List, ListItem, ListItemText, IconButton } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, Box, ThemeProvider, createTheme, CssBaseline, Dialog, DialogTitle, DialogContent, TextField, List, ListItem, ListItemText, IconButton, Tooltip } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import TaskNode from './components/TaskNode';
 import AgentNode from './components/AgentNode';
 import Sidebar from './components/Sidebar';
 import BeginNode from './components/BeginNode';
 import RerouteNode from './components/RerouteNode';
+import SaveIcon from '@mui/icons-material/Save';
+import LoadIcon from '@mui/icons-material/FolderOpen';
+import AddIcon from '@mui/icons-material/Add';
 import './App.css';
+import { TaskData } from './components/TaskNode';
+import { AgentData } from './components/AgentNode';
+import { v4 as uuidv4 } from 'uuid';
 
 const nodeTypes = {
-  task: TaskNode,
-  agent: AgentNode,
+  task: (props: NodeProps<TaskData>) => <TaskNode {...props} onSave={() => {}} updateSavedTasks={(tasks) => setSavedTasks(tasks)} />,
+  agent: (props: NodeProps<AgentData>) => <AgentNode {...props} onSave={() => {}} updateSavedAgents={(agents) => setSavedAgents(agents)} />,
   begin: BeginNode,
   reroute: RerouteNode,
 };
 
-let id = 0;
-const getId = () => `node_${id++}`;
+const getId = () => `node_${uuidv4()}`;
 
 function Flow() {
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -44,8 +50,15 @@ function Flow() {
   const [pythonDialogOpen, setPythonDialogOpen] = useState(false);
   const [pythonContent, setPythonContent] = useState('');
   const [graphName, setGraphName] = useState('');
-  const [savedGraphs, setSavedGraphs] = useState<{ name: string; nodes: Node[]; edges: Edge[] }[]>([]);
+  const [savedGraphs, setSavedGraphs] = useState<{ name: string; nodes: Node[]; edges: Edge[]; graphName: string }[]>([]);
   const { project } = useReactFlow();
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [activeGraphTitle, setActiveGraphTitle] = useState('Untitled');
+  const [selectedGraphName, setSelectedGraphName] = useState('');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [savedAgents, setSavedAgents] = useState<AgentData[]>([]);
+  const [savedTasks, setSavedTasks] = useState<TaskData[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem('savedGraphs');
@@ -55,12 +68,11 @@ function Flow() {
   }, []);
 
   const saveGraph = () => {
-    if (!graphName) return alert('Please enter a name for the graph.');
-    const newGraph = { name: graphName, nodes, edges };
-    const updatedGraphs = [...savedGraphs, newGraph];
+    if (!graphName) return alert('Please enter a name for the file.');
+    const newGraph = { name: graphName, nodes, edges, graphName: activeGraphTitle };
+    const updatedGraphs = [...savedGraphs.filter(g => g.name !== graphName), newGraph];
     setSavedGraphs(updatedGraphs);
     localStorage.setItem('savedGraphs', JSON.stringify(updatedGraphs));
-    setGraphName('');
   };
 
   const loadGraph = (name: string) => {
@@ -68,6 +80,7 @@ function Flow() {
     if (graph) {
       setNodes(graph.nodes);
       setEdges(graph.edges);
+      setActiveGraphTitle(graph.graphName);
     }
   };
 
@@ -210,6 +223,23 @@ function Flow() {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  const onChange = (nodeId: string, field: string, value: string) => {
+    setNodes(nds => 
+      nds.map(node => {
+        if (node.id === nodeId) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              [field]: value,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  };
+
   const onDrop = useCallback(
     (event: DragEvent) => {
       event.preventDefault();
@@ -217,10 +247,9 @@ function Flow() {
       const type = event.dataTransfer.getData('application/reactflow');
       if (!type) return;
 
-      // Only allow one execution node
-      if (type === 'execution' && nodes.some(n => n.type === 'execution')) {
-        return;
-      }
+      const savedData = event.dataTransfer.getData('savedData');
+      const nodeData = savedData ? JSON.parse(savedData) : {};
+      console.log('Loading Node Data:', nodeData);
 
       const position = project({
         x: event.clientX - 200,  // Adjust for sidebar width
@@ -232,23 +261,9 @@ function Flow() {
         type,
         position,
         data: { 
-          label: `${type.charAt(0).toUpperCase() + type.slice(1)}`,
-          onChange: (field: string, value: string) => {
-            setNodes(nds => 
-              nds.map(node => {
-                if (node.id === newNode.id) {
-                  return {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      [field]: value,
-                    },
-                  };
-                }
-                return node;
-              })
-            );
-          },
+          ...nodeData,
+          label: nodeData.label || `${type.charAt(0).toUpperCase() + type.slice(1)}`,
+          onChange: (field: string, value: string) => onChange(newNode.id, field, value),
           onExecute: type === 'execution' ? handleRunCrew : undefined
         },
       };
@@ -428,37 +443,60 @@ function Flow() {
     // End custom drag logic here
   }, []);
 
+  const newGraph = () => {
+    setNodes([]);
+    setEdges([]);
+    setActiveGraphTitle('Untitled');
+  };
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            CrewAI Visual Editor
+            {isEditingTitle ? (
+              <TextField
+                value={activeGraphTitle}
+                onChange={(e) => setActiveGraphTitle(e.target.value)}
+                onBlur={() => setIsEditingTitle(false)}
+                autoFocus
+                sx={{ width: '100%' }}
+              />
+            ) : (
+              <span onClick={() => setIsEditingTitle(true)} style={{ cursor: 'pointer' }}>
+                {activeGraphTitle} - CrewAI Visual Editor
+              </span>
+            )}
           </Typography>
-          <Button color="inherit" onClick={handleRunCrew} sx={{ mr: 2 }}>
-            Run Crew
-          </Button>
-          <Button color="inherit" onClick={handleYamlExport} sx={{ mr: 2 }}>
-            YAML Export
-          </Button>
-          <Button color="inherit" onClick={handlePythonExport} sx={{ mr: 2 }}>
-            Python Export
-          </Button>
-          <TextField
-            label="Graph Name"
-            variant="outlined"
-            size="small"
-            value={graphName}
-            onChange={(e) => setGraphName(e.target.value)}
-            sx={{ mr: 2 }}
-          />
-          <Button color="inherit" onClick={saveGraph} sx={{ mr: 2 }}>
-            Save Graph
-          </Button>
+          <Tooltip title="New Graph">
+            <IconButton color="inherit" onClick={newGraph} sx={{ mr: 2 }}>
+              <AddIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="YAML Export">
+            <Button color="inherit" onClick={handleYamlExport} sx={{ mr: 2 }}>
+              YAML Export
+            </Button>
+          </Tooltip>
+          <Tooltip title="Python Export">
+            <Button color="inherit" onClick={handlePythonExport} sx={{ mr: 2 }}>
+              Python Export
+            </Button>
+          </Tooltip>
+          <Tooltip title="Save Graph">
+            <Button color="inherit" onClick={() => setSaveDialogOpen(true)} sx={{ mr: 2 }}>
+              <SaveIcon />
+            </Button>
+          </Tooltip>
+          <Tooltip title="Load Graph">
+            <Button color="inherit" onClick={() => setLoadDialogOpen(true)} sx={{ mr: 2 }}>
+              <LoadIcon />
+            </Button>
+          </Tooltip>
         </Toolbar>
       </AppBar>
       <Box sx={{ display: 'flex', flexGrow: 1 }}>
-        <Sidebar />
+        <Sidebar savedAgents={savedAgents} savedTasks={savedTasks} setSavedAgents={setSavedAgents} setSavedTasks={setSavedTasks} />
         <Box sx={{ flexGrow: 1 }}>
           <ReactFlow
             nodes={nodes}
@@ -479,21 +517,6 @@ function Flow() {
             <Background />
             <Controls />
           </ReactFlow>
-        </Box>
-        <Box sx={{ width: 200, bgcolor: 'background.paper' }}>
-          <Typography variant="h6" component="div" sx={{ p: 2 }}>
-            Saved Graphs
-          </Typography>
-          <List>
-            {savedGraphs.map((graph) => (
-              <ListItem key={graph.name} component="div" onClick={() => loadGraph(graph.name)} style={{ cursor: 'pointer' }}>
-                <ListItemText primary={graph.name} />
-                <IconButton edge="end" aria-label="delete" onClick={(e) => { e.stopPropagation(); deleteGraph(graph.name); }}>
-                  <DeleteIcon />
-                </IconButton>
-              </ListItem>
-            ))}
-          </List>
         </Box>
       </Box>
       <Dialog open={yamlDialogOpen} onClose={() => setYamlDialogOpen(false)} fullWidth maxWidth="md">
@@ -520,6 +543,76 @@ function Flow() {
             variant="outlined"
             InputProps={{ readOnly: true }}
           />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Save File</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="File Name"
+            variant="outlined"
+            fullWidth
+            value={graphName}
+            onChange={(e) => setGraphName(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <List>
+            {savedGraphs.map((graph) => (
+              <ListItem key={graph.name} component="div">
+                <ListItemText primary={graph.name} />
+                <IconButton edge="end" aria-label="overwrite" onClick={() => {
+                  if (window.confirm(`Overwrite ${graph.name}?`)) {
+                    saveGraph();
+                    setSaveDialogOpen(false);
+                  }
+                }}>
+                  <SaveIcon />
+                </IconButton>
+              </ListItem>
+            ))}
+          </List>
+          <Button
+            variant="contained"
+            color="primary"
+            fullWidth
+            onClick={() => {
+              saveGraph();
+              setSaveDialogOpen(false);
+            }}
+          >
+            Save
+          </Button>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={loadDialogOpen} onClose={() => setLoadDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Load File</DialogTitle>
+        <DialogContent>
+          <List>
+            {savedGraphs.map((graph) => (
+              <ListItem key={graph.name} component="div" onClick={() => setSelectedGraphName(graph.name)} style={{ cursor: 'pointer' }}>
+                <ListItemText primary={graph.name} />
+              </ListItem>
+            ))}
+          </List>
+          <TextField
+            label="Selected File"
+            variant="outlined"
+            fullWidth
+            value={selectedGraphName}
+            onChange={(e) => setSelectedGraphName(e.target.value)}
+            sx={{ mt: 2, mb: 2 }}
+          />
+          <Button
+            variant="contained"
+            color="primary"
+            fullWidth
+            onClick={() => {
+              loadGraph(selectedGraphName);
+              setLoadDialogOpen(false);
+            }}
+          >
+            Load
+          </Button>
         </DialogContent>
       </Dialog>
     </Box>
