@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from 'react';
+import { memo, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Card, CardContent, Typography, TextField, Box, IconButton } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';

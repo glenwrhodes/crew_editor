@@ -13,12 +13,10 @@ import ReactFlow, {
   ReactFlowProvider,
   addEdge,
   MarkerType,
-  Position,
   NodeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { AppBar, Toolbar, Typography, Button, Box, ThemeProvider, createTheme, CssBaseline, Dialog, DialogTitle, DialogContent, TextField, List, ListItem, ListItemText, IconButton, Tooltip } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
 import TaskNode from './components/TaskNode';
 import AgentNode from './components/AgentNode';
 import Sidebar from './components/Sidebar';
@@ -32,14 +30,16 @@ import { TaskData } from './components/TaskNode';
 import { AgentData } from './components/AgentNode';
 import { v4 as uuidv4 } from 'uuid';
 
-const nodeTypes = {
-  task: (props: NodeProps<TaskData>) => <TaskNode {...props} onSave={() => {}} updateSavedTasks={(tasks) => setSavedTasks(tasks)} />,
-  agent: (props: NodeProps<AgentData>) => <AgentNode {...props} onSave={() => {}} updateSavedAgents={(agents) => setSavedAgents(agents)} />,
-  begin: BeginNode,
-  reroute: RerouteNode,
-};
-
 const getId = () => `node_${uuidv4()}`;
+
+// Define Agent and Task types to match Sidebar's requirements
+interface Agent extends AgentData {
+  name: string;
+}
+
+interface Task extends TaskData {
+  name: string;
+}
 
 function Flow() {
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -57,8 +57,15 @@ function Flow() {
   const [activeGraphTitle, setActiveGraphTitle] = useState('Untitled');
   const [selectedGraphName, setSelectedGraphName] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [savedAgents, setSavedAgents] = useState<AgentData[]>([]);
-  const [savedTasks, setSavedTasks] = useState<TaskData[]>([]);
+  const [savedAgents, setSavedAgents] = useState<Agent[]>([]);
+  const [savedTasks, setSavedTasks] = useState<Task[]>([]);
+
+  const nodeTypes = {
+    task: (props: NodeProps<TaskData>) => <TaskNode {...props} onSave={() => {}} updateSavedTasks={(tasks) => setSavedTasks(tasks as Task[])} />,
+    agent: (props: NodeProps<AgentData>) => <AgentNode {...props} onSave={() => {}} updateSavedAgents={(agents) => setSavedAgents(agents as Agent[])} />,
+    begin: BeginNode,
+    reroute: RerouteNode,
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('savedGraphs');
@@ -82,12 +89,6 @@ function Flow() {
       setEdges(graph.edges);
       setActiveGraphTitle(graph.graphName);
     }
-  };
-
-  const deleteGraph = (name: string) => {
-    const updatedGraphs = savedGraphs.filter(g => g.name !== name);
-    setSavedGraphs(updatedGraphs);
-    localStorage.setItem('savedGraphs', JSON.stringify(updatedGraphs));
   };
 
   const onNodesChange = useCallback(
