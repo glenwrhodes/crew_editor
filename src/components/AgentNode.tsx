@@ -1,15 +1,12 @@
 import { memo, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Card, CardContent, Typography, TextField, Select, MenuItem, FormControl, InputLabel, Box } from '@mui/material';
+import { Card, CardContent, Typography, TextField, Box } from '@mui/material';
 
 interface AgentData {
-  label?: string;
   name?: string;
   role?: string;
   goal?: string;
   backstory?: string;
-  memory?: string;
-  verbose?: string;
   tools?: string;
   onChange?: (field: string, value: string) => void;
 }
@@ -27,7 +24,7 @@ const AgentNode = ({ data }: NodeProps<AgentData>) => {
         minWidth: 300,
         position: 'relative',
         overflow: 'visible',
-        maxWidth: 200,
+        maxWidth: 300,
         bgcolor: isSelected ? '#334' : '#221',
         border: isSelected ? '2px solid white' : 'none',
       }}
@@ -48,21 +45,17 @@ const AgentNode = ({ data }: NodeProps<AgentData>) => {
           sx={{ mt: 1 }}
         />
 
-        <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-          <InputLabel>Role</InputLabel>
-          <Select
-            label="Role"
-            value={data.role || ''}
-            onChange={(e) => data.onChange?.('role', e.target.value)}
-          >
-            <MenuItem value="researcher">Researcher</MenuItem>
-            <MenuItem value="writer">Writer</MenuItem>
-            <MenuItem value="analyst">Analyst</MenuItem>
-            <MenuItem value="developer">Developer</MenuItem>
-            <MenuItem value="reviewer">Reviewer</MenuItem>
-            <MenuItem value="custom">Custom</MenuItem>
-          </Select>
-        </FormControl>
+        <TextField
+          label="Role"
+          variant="outlined"
+          size="small"
+          fullWidth
+          multiline
+          rows={2}
+          value={data.role || ''}
+          onChange={(e) => data.onChange?.('role', e.target.value)}
+          sx={{ mt: 1 }}
+        />
 
         <TextField
           label="Goal"
@@ -82,36 +75,11 @@ const AgentNode = ({ data }: NodeProps<AgentData>) => {
           size="small"
           fullWidth
           multiline
-          rows={2}
+          rows={3}
           value={data.backstory || ''}
           onChange={(e) => data.onChange?.('backstory', e.target.value)}
           sx={{ mt: 1 }}
         />
-
-        <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-          <InputLabel>Memory</InputLabel>
-          <Select
-            label="Memory"
-            value={data.memory || 'none'}
-            onChange={(e) => data.onChange?.('memory', e.target.value)}
-          >
-            <MenuItem value="none">None</MenuItem>
-            <MenuItem value="short_term">Short Term</MenuItem>
-            <MenuItem value="long_term">Long Term</MenuItem>
-          </Select>
-        </FormControl>
-
-        <FormControl fullWidth size="small" sx={{ mt: 1 }}>
-          <InputLabel>Verbose</InputLabel>
-          <Select
-            label="Verbose"
-            value={data.verbose || 'false'}
-            onChange={(e) => data.onChange?.('verbose', e.target.value)}
-          >
-            <MenuItem value="true">True</MenuItem>
-            <MenuItem value="false">False</MenuItem>
-          </Select>
-        </FormControl>
 
         <TextField
           label="Tools"

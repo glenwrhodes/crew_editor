@@ -14,26 +14,22 @@ import ReactFlow, {
   addEdge,
   MarkerType,
   Position,
-  Handle
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { AppBar, Toolbar, Typography, Button, Box, ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, Box, ThemeProvider, createTheme, CssBaseline, Dialog, DialogTitle, DialogContent, TextField, List, ListItem, ListItemText, IconButton } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 import TaskNode from './components/TaskNode';
 import AgentNode from './components/AgentNode';
 import Sidebar from './components/Sidebar';
 import BeginNode from './components/BeginNode';
+import RerouteNode from './components/RerouteNode';
 import './App.css';
 
 const nodeTypes = {
   task: TaskNode,
   agent: AgentNode,
   begin: BeginNode,
-  reroute: () => (
-    <div style={{ width: 10, height: 10, backgroundColor: 'gray', borderRadius: '50%', position: 'relative' }}>
-      <Handle type="target" position={Position.Left} style={{ background: 'white', borderRadius: '50%', width: 6, height: 6, top: '50%', transform: 'translateY(-50%)' }} />
-      <Handle type="source" position={Position.Right} style={{ background: 'white', borderRadius: '50%', width: 6, height: 6, top: '50%', transform: 'translateY(-50%)' }} />
-    </div>
-  ),
+  reroute: RerouteNode,
 };
 
 let id = 0;
@@ -43,7 +39,43 @@ function Flow() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [yamlDialogOpen, setYamlDialogOpen] = useState(false);
+  const [yamlContent, setYamlContent] = useState('');
+  const [pythonDialogOpen, setPythonDialogOpen] = useState(false);
+  const [pythonContent, setPythonContent] = useState('');
+  const [graphName, setGraphName] = useState('');
+  const [savedGraphs, setSavedGraphs] = useState<{ name: string; nodes: Node[]; edges: Edge[] }[]>([]);
   const { project } = useReactFlow();
+
+  useEffect(() => {
+    const saved = localStorage.getItem('savedGraphs');
+    if (saved) {
+      setSavedGraphs(JSON.parse(saved));
+    }
+  }, []);
+
+  const saveGraph = () => {
+    if (!graphName) return alert('Please enter a name for the graph.');
+    const newGraph = { name: graphName, nodes, edges };
+    const updatedGraphs = [...savedGraphs, newGraph];
+    setSavedGraphs(updatedGraphs);
+    localStorage.setItem('savedGraphs', JSON.stringify(updatedGraphs));
+    setGraphName('');
+  };
+
+  const loadGraph = (name: string) => {
+    const graph = savedGraphs.find(g => g.name === name);
+    if (graph) {
+      setNodes(graph.nodes);
+      setEdges(graph.edges);
+    }
+  };
+
+  const deleteGraph = (name: string) => {
+    const updatedGraphs = savedGraphs.filter(g => g.name !== name);
+    setSavedGraphs(updatedGraphs);
+    localStorage.setItem('savedGraphs', JSON.stringify(updatedGraphs));
+  };
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -56,6 +88,10 @@ function Flow() {
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     if (event.key === 'Delete' && selectedNodeId) {
       setNodes((nds) => nds.filter(node => node.id !== selectedNodeId));
+      // Remove any edges connected to the deleted node
+      setEdges((eds) => eds.filter(edge => 
+        edge.source !== selectedNodeId && edge.target !== selectedNodeId
+      ));
       setSelectedNodeId(null);
     }
   }, [selectedNodeId]);
@@ -77,7 +113,31 @@ function Flow() {
       const sourceNode = nodes.find(n => n.id === params.source);
       const targetNode = nodes.find(n => n.id === params.target);
       
-      if (!sourceNode || !targetNode) return;
+      if (!sourceNode || !targetNode || !params.source || !params.target) return;
+
+      // Handle reroute node type claiming
+      if (targetNode.type === 'reroute') {
+        const isExecutionConnection = sourceNode.type === 'begin' || 
+          (sourceNode.type === 'task' && params.sourceHandle === 'exec-out');
+        const isAgentConnection = sourceNode.type === 'agent' || 
+          (sourceNode.type === 'task' && params.sourceHandle === 'agent-out');
+
+        // Update reroute node type if not already claimed
+        if (!targetNode.data.claimedType) {
+          setNodes(nds => nds.map(node => {
+            if (node.id === targetNode.id) {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  claimedType: isExecutionConnection ? 'execution' : isAgentConnection ? 'agent' : undefined
+                }
+              };
+            }
+            return node;
+          }));
+        }
+      }
 
       // Define valid connections
       const isValid = (
@@ -86,27 +146,60 @@ function Flow() {
         // Task can connect to Task's execution input
         (sourceNode.type === 'task' && targetNode.type === 'task' && params.targetHandle === 'exec-in') ||
         // Begin can connect to Task's execution input
-        (sourceNode.type === 'begin' && targetNode.type === 'task' && params.targetHandle === 'exec-in')
+        (sourceNode.type === 'begin' && targetNode.type === 'task' && params.targetHandle === 'exec-in') ||
+        // Any node can connect to reroute node
+        (targetNode.type === 'reroute') ||
+        // Reroute node can connect to matching type inputs
+        (sourceNode.type === 'reroute' && (
+          (sourceNode.data.claimedType === 'execution' && params.targetHandle === 'exec-in') ||
+          (sourceNode.data.claimedType === 'agent' && params.targetHandle === 'agent')
+        ))
       );
       
       if (isValid) {
-        const isExecutionLine = params.targetHandle === 'exec-in';
-        setEdges((eds) => addEdge({
-          ...params,
-          type: 'default',
-          animated: isExecutionLine,
-          style: {
-            strokeDasharray: isExecutionLine ? '5,5' : 'none',
-            stroke: isExecutionLine ? 'white' : 'yellow',
-            strokeWidth: 2,
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: isExecutionLine ? 'white' : 'yellow',
-            width: 20,
-            height: 20,
-          },
-        }, eds));
+        const isExecutionLine = params.targetHandle === 'exec-in' || 
+          (sourceNode.data?.claimedType === 'execution' && targetNode.type === 'reroute') ||
+          (sourceNode.type === 'reroute' && sourceNode.data?.claimedType === 'execution');
+
+        const edgeStyle = {
+          strokeDasharray: isExecutionLine ? '5,5' : 'none',
+          stroke: isExecutionLine ? 'white' : 'yellow',
+          strokeWidth: 2,
+        };
+
+        const edgeMarker = {
+          type: MarkerType.ArrowClosed,
+          color: isExecutionLine ? 'white' : 'yellow',
+          width: 20,
+          height: 20,
+        };
+
+        // For reroute nodes, preserve existing connections and add the new one
+        if (sourceNode.type === 'reroute') {
+          setEdges(eds => {
+            // Keep all existing connections when adding a new one from a reroute node
+            const newConnection: Edge = {
+              id: getId(),
+              source: sourceNode.id,
+              target: targetNode.id,
+              sourceHandle: params.sourceHandle || undefined,
+              targetHandle: params.targetHandle || undefined,
+              type: 'default',
+              animated: isExecutionLine,
+              style: edgeStyle,
+              markerEnd: edgeMarker,
+            };
+            return [...eds, newConnection];
+          });
+        } else {
+          setEdges((eds) => addEdge({
+            ...params,
+            type: 'default',
+            animated: isExecutionLine,
+            style: edgeStyle,
+            markerEnd: edgeMarker,
+          }, eds));
+        }
       }
     },
     [nodes]
@@ -194,6 +287,91 @@ function Flow() {
     });
   };
 
+  const handleYamlExport = () => {
+    const agentsYaml = nodes.filter(n => n.type === 'agent').map(agent => {
+      const { name, role, goal, backstory } = agent.data;
+      return `${name}:
+  role: >
+    ${role}
+  goal: >
+    ${goal}
+  backstory: >
+    ${backstory}`;
+    }).join('\n\n');
+
+    const tasksYaml = nodes.filter(n => n.type === 'task').map(task => {
+      const { name, description, expected_output } = task.data;
+      const connectedAgent = edges.find(e => e.target === task.id && nodes.find(n => n.id === e.source)?.type === 'agent');
+      const agentName = connectedAgent ? nodes.find(n => n.id === connectedAgent.source)?.data.name : 'None';
+      return `${name}:
+  description: >
+    ${description}
+  expected_output: >
+    ${expected_output}
+  agent: ${agentName}`;
+    }).join('\n\n');
+
+    setYamlContent(`Agents:\n\n${agentsYaml}\n\nTasks:\n\n${tasksYaml}`);
+    setYamlDialogOpen(true);
+  };
+
+  const handlePythonExport = () => {
+    const agentsCode = nodes.filter(n => n.type === 'agent').map(agent => {
+      const { name, tools } = agent.data;
+      const safeName = name?.replace(/\s+/g, '_');
+      const toolsArray = tools ? tools.split(',').map((tool: string) => tool.trim()).filter((tool: string) => tool.length > 0) : [];
+      const toolsCode = toolsArray.map((tool: string) => `${tool}()`).join(', ');
+      return `@agent\ndef ${safeName}() -> Agent:\n    return Agent(\n        config=self.agents_config['${name}'],\n        verbose=True,\n        tools=[${toolsCode}]\n    )`;
+    }).join('\n\n');
+
+    const getTaskOrder = () => {
+      const beginNode = nodes.find(n => n.type === 'begin');
+      if (!beginNode) return [];
+
+      const orderedTasks: string[] = [];
+      const visited = new Set<string>();
+
+      const dfs = (nodeId: string) => {
+        if (visited.has(nodeId)) return;
+        visited.add(nodeId);
+
+        const outgoingEdges = edges.filter(e => e.source === nodeId && nodes.find(n => n.id === e.target)?.type === 'task');
+        outgoingEdges.forEach(edge => {
+          const targetNode = nodes.find(n => n.id === edge.target);
+          if (targetNode && targetNode.type === 'task') {
+            orderedTasks.push(targetNode.data.name?.replace(/\s+/g, '_') || '');
+            dfs(targetNode.id);
+          }
+        });
+      };
+
+      dfs(beginNode.id);
+
+      // Add unconnected tasks at the end
+      const unconnectedTasks = nodes.filter(n => n.type === 'task' && !visited.has(n.id)).map(n => n.data.name?.replace(/\s+/g, '_') || '');
+      return [...orderedTasks, ...unconnectedTasks];
+    };
+
+    const taskOrder = getTaskOrder();
+
+    const tasksCode = taskOrder.map(safeName => {
+      const taskNode = nodes.find(n => n.data.name?.replace(/\s+/g, '_') === safeName);
+      if (!taskNode) return '';
+
+      const contextTasks = edges
+        .filter(e => e.target === taskNode.id && nodes.find(n => n.id === e.source)?.type === 'task')
+        .map(e => nodes.find(n => n.id === e.source)?.data.name?.replace(/\s+/g, '_'))
+        .filter((name): name is string => !!name);
+      const contextCode = contextTasks.length > 0 ? `,\n        context=[${contextTasks.map(ct => `self.${ct}()`).join(', ')}]` : '';
+      return `@task\ndef ${safeName}() -> Task:\n    return Task(\n        config=self.tasks_config['${taskNode.data.name}'],\n        output_file='${safeName}.md'${contextCode}\n    )`;
+    }).join('\n\n');
+
+    const crewCode = `@crew\ndef crew() -> Crew:\n    return Crew(\n        agents=self.agents,\n        tasks=self.tasks,\n        process=Process.sequential,\n        verbose=True\n    )`;
+
+    setPythonContent(`# Generated crew.py\n\nfrom crewai import Agent, Crew, Process, Task\nfrom crewai.project import CrewBase, agent, crew, task, before_kickoff\nimport os\n\n@CrewBase\nclass GeneratedCrew():\n    agents_config = 'config/agents.yaml'\n    tasks_config = 'config/tasks.yaml'\n\n${agentsCode}\n\n${tasksCode}\n\n${crewCode}`);
+    setPythonDialogOpen(true);
+  };
+
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
   }, []);
@@ -257,8 +435,25 @@ function Flow() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             CrewAI Visual Editor
           </Typography>
-          <Button color="inherit" onClick={handleRunCrew}>
+          <Button color="inherit" onClick={handleRunCrew} sx={{ mr: 2 }}>
             Run Crew
+          </Button>
+          <Button color="inherit" onClick={handleYamlExport} sx={{ mr: 2 }}>
+            YAML Export
+          </Button>
+          <Button color="inherit" onClick={handlePythonExport} sx={{ mr: 2 }}>
+            Python Export
+          </Button>
+          <TextField
+            label="Graph Name"
+            variant="outlined"
+            size="small"
+            value={graphName}
+            onChange={(e) => setGraphName(e.target.value)}
+            sx={{ mr: 2 }}
+          />
+          <Button color="inherit" onClick={saveGraph} sx={{ mr: 2 }}>
+            Save Graph
           </Button>
         </Toolbar>
       </AppBar>
@@ -285,7 +480,48 @@ function Flow() {
             <Controls />
           </ReactFlow>
         </Box>
+        <Box sx={{ width: 200, bgcolor: 'background.paper' }}>
+          <Typography variant="h6" component="div" sx={{ p: 2 }}>
+            Saved Graphs
+          </Typography>
+          <List>
+            {savedGraphs.map((graph) => (
+              <ListItem key={graph.name} component="div" onClick={() => loadGraph(graph.name)} style={{ cursor: 'pointer' }}>
+                <ListItemText primary={graph.name} />
+                <IconButton edge="end" aria-label="delete" onClick={(e) => { e.stopPropagation(); deleteGraph(graph.name); }}>
+                  <DeleteIcon />
+                </IconButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
       </Box>
+      <Dialog open={yamlDialogOpen} onClose={() => setYamlDialogOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>YAML Export</DialogTitle>
+        <DialogContent>
+          <TextField
+            multiline
+            fullWidth
+            rows={20}
+            value={yamlContent}
+            variant="outlined"
+            InputProps={{ readOnly: true }}
+          />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={pythonDialogOpen} onClose={() => setPythonDialogOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Python Export</DialogTitle>
+        <DialogContent>
+          <TextField
+            multiline
+            fullWidth
+            rows={20}
+            value={pythonContent}
+            variant="outlined"
+            InputProps={{ readOnly: true }}
+          />
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }
