@@ -48,7 +48,7 @@ This section will guide you through the process of using the CrewAI Visual Edito
 
 ### First: Install CrewAI ###
 
-Follow the instructions in the [CrewAI documentation](https://docs.crewai.com/installation) to install CrewAI and run your crew.
+Follow the instructions in the [CrewAI documentation](https://docs.crewai.com/installation) to install CrewAI and create your defaultcrew.
 
 ### Step 1: Add a Begin Node
 
