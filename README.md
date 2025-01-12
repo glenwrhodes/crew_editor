@@ -86,10 +86,10 @@ Follow the instructions in the [CrewAI documentation](https://docs.crewai.com/in
 ![Step 5: Export YAML and Python Scripts](./screenshots/yaml.png)
 ![Step 5: Export YAML and Python Scripts](./screenshots/python.png)
 
-Once you have completed these steps, you will have a basic crew setup ready for further development or deployment. Copy and paste the YAML into your agents.yaml and tasks.yaml files.
-Copy and paste the Python script into your crew.py file.
-
-
+- Once you have completed these steps, you will have a basic crew setup ready for further development or deployment. Copy and paste the YAML into your agents.yaml and tasks.yaml files.
+- Copy and paste the Python script into your crew.py file.
+- You can save agents and tasks to the sidebar to reuse them later, by clicking the disk icon in the top right corner of each node.
+- You can save and load your graphs by clicking the save/load icon in the top right corner of the page.
 
 ## Development
 
