@@ -112,31 +112,67 @@ export interface ToolInfo {
 }
 
 export const AVAILABLE_TOOLS: ToolInfo[] = [
-  { name: 'SerperDevTool', description: 'Web search via Serper API', category: 'Search' },
-  { name: 'ScrapeWebsiteTool', description: 'Scrape website content', category: 'Web' },
-  { name: 'FileReadTool', description: 'Read file contents', category: 'File' },
-  { name: 'FileWriteTool', description: 'Write to files', category: 'File' },
-  { name: 'DirectoryReadTool', description: 'List directory contents', category: 'File' },
-  { name: 'DirectorySearchTool', description: 'Search across directories', category: 'File' },
+  // File & Document
+  { name: 'FileReadTool', description: 'Read any file type', category: 'File & Document' },
+  { name: 'FileWriteTool', description: 'Write content to files', category: 'File & Document' },
+  { name: 'DirectoryReadTool', description: 'List directory contents', category: 'File & Document' },
+  { name: 'DirectorySearchTool', description: 'RAG search across directory contents', category: 'File & Document' },
+  { name: 'CSVSearchTool', description: 'RAG search within CSV files', category: 'File & Document' },
+  { name: 'DOCXSearchTool', description: 'RAG search within DOCX files', category: 'File & Document' },
+  { name: 'JSONSearchTool', description: 'RAG search within JSON files', category: 'File & Document' },
+  { name: 'MDXSearchTool', description: 'RAG search within MDX files', category: 'File & Document' },
+  { name: 'PDFSearchTool', description: 'RAG search within PDF files', category: 'File & Document' },
+  { name: 'TXTSearchTool', description: 'RAG search within text files', category: 'File & Document' },
+  { name: 'XMLSearchTool', description: 'RAG search within XML files', category: 'File & Document' },
+
+  // Web Scraping & Browsing
+  { name: 'ScrapeWebsiteTool', description: 'Extract content from web pages', category: 'Web Scraping' },
+  { name: 'SeleniumScrapingTool', description: 'Browser-based scraping with Selenium', category: 'Web Scraping' },
+  { name: 'BrowserbaseLoadTool', description: 'Load pages via Browserbase cloud browsers', category: 'Web Scraping' },
+  { name: 'FirecrawlCrawlWebsiteTool', description: 'Crawl websites recursively with Firecrawl', category: 'Web Scraping' },
+  { name: 'FirecrawlScrapeWebsiteTool', description: 'Scrape single pages with Firecrawl', category: 'Web Scraping' },
+  { name: 'FirecrawlSearchTool', description: 'Search the web with Firecrawl', category: 'Web Scraping' },
+  { name: 'FirecrawlMapWebsiteTool', description: 'Map website structure with Firecrawl', category: 'Web Scraping' },
+  { name: 'SpiderTool', description: 'High-speed web crawling and scraping', category: 'Web Scraping' },
+
+  // Search & Research
+  { name: 'SerperDevTool', description: 'Google search via Serper API', category: 'Search' },
+  { name: 'EXASearchTool', description: 'Neural search with EXA API', category: 'Search' },
+  { name: 'WebsiteSearchTool', description: 'RAG search on website content', category: 'Search' },
   { name: 'CodeDocsSearchTool', description: 'Search code documentation', category: 'Search' },
-  { name: 'CodeInterpreterTool', description: 'Execute Python code', category: 'Code' },
-  { name: 'MDXSearchTool', description: 'Search MDX documents', category: 'Search' },
-  { name: 'PDFSearchTool', description: 'Search PDF documents', category: 'Search' },
-  { name: 'TXTSearchTool', description: 'Search text files', category: 'Search' },
-  { name: 'CSVSearchTool', description: 'Search CSV files', category: 'Search' },
-  { name: 'JSONSearchTool', description: 'Search JSON files', category: 'Search' },
-  { name: 'XMLSearchTool', description: 'Search XML files', category: 'Search' },
-  { name: 'DOCXSearchTool', description: 'Search DOCX files', category: 'Search' },
-  { name: 'YoutubeVideoSearchTool', description: 'Search YouTube videos', category: 'Search' },
-  { name: 'YoutubeChannelSearchTool', description: 'Search YouTube channels', category: 'Search' },
-  { name: 'GithubSearchTool', description: 'Search GitHub repos', category: 'Search' },
-  { name: 'WebsiteSearchTool', description: 'RAG search on websites', category: 'Search' },
-  { name: 'DallETool', description: 'Generate images with DALL-E', category: 'AI' },
-  { name: 'VisionTool', description: 'Analyze images with vision', category: 'AI' },
-  { name: 'EXASearchTool', description: 'Neural search with EXA', category: 'Search' },
-  { name: 'RagTool', description: 'RAG-based document search', category: 'Search' },
-  { name: 'BrowserbaseLoadTool', description: 'Load webpages via Browserbase', category: 'Web' },
-  { name: 'ComposioTool', description: 'Composio integrations', category: 'Integration' },
+  { name: 'GithubSearchTool', description: 'Search GitHub repositories', category: 'Search' },
+  { name: 'YoutubeVideoSearchTool', description: 'Search YouTube video transcripts', category: 'Search' },
+  { name: 'YoutubeChannelSearchTool', description: 'Search YouTube channel content', category: 'Search' },
+
+  // Database & Data
+  { name: 'NL2SQLTool', description: 'Natural language to SQL query conversion', category: 'Database' },
+  { name: 'PGSearchTool', description: 'RAG search on PostgreSQL databases', category: 'Database' },
+  { name: 'MySQLSearchTool', description: 'RAG search on MySQL databases', category: 'Database' },
+  { name: 'SnowflakeSearchTool', description: 'Query and search Snowflake data warehouses', category: 'Database' },
+  { name: 'SingleStoreSearchTool', description: 'Execute queries on SingleStore', category: 'Database' },
+  { name: 'QdrantVectorSearchTool', description: 'Semantic search with Qdrant vector DB', category: 'Database' },
+  { name: 'WeaviateVectorSearchTool', description: 'Semantic search with Weaviate vector DB', category: 'Database' },
+  { name: 'MongoDBVectorSearchTool', description: 'Vector search on MongoDB Atlas', category: 'Database' },
+
+  // AI & Machine Learning
+  { name: 'CodeInterpreterTool', description: 'Execute Python code in a sandbox', category: 'AI & ML' },
+  { name: 'DallETool', description: 'Generate images with DALL-E', category: 'AI & ML' },
+  { name: 'VisionTool', description: 'Extract text and info from images', category: 'AI & ML' },
+  { name: 'RagTool', description: 'RAG-based document Q&A', category: 'AI & ML' },
+  { name: 'AIMindTool', description: 'Query data sources in natural language', category: 'AI & ML' },
+  { name: 'LangChainTool', description: 'Wrap LangChain tools for use in CrewAI', category: 'AI & ML' },
+  { name: 'LlamaIndexTool', description: 'Wrap LlamaIndex tools and query engines', category: 'AI & ML' },
+
+  // Cloud & Storage
+  { name: 'S3ReaderTool', description: 'Read files from AWS S3 buckets', category: 'Cloud' },
+  { name: 'S3WriterTool', description: 'Write files to AWS S3 buckets', category: 'Cloud' },
+  { name: 'BedrockKBRetrieverTool', description: 'Query Amazon Bedrock Knowledge Bases', category: 'Cloud' },
+
+  // Automation & Integration
+  { name: 'ComposioTool', description: '250+ integrations via Composio', category: 'Automation' },
+  { name: 'ApifyActorsTool', description: 'Run Apify Actors for web automation', category: 'Automation' },
+  { name: 'MultiOnTool', description: 'Web browsing via natural language', category: 'Automation' },
+  { name: 'ZapierActionsTool', description: 'Trigger Zapier actions and workflows', category: 'Automation' },
 ];
 
 export interface LLMInfo {
