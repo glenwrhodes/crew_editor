@@ -39,7 +39,28 @@ export interface CrewSettings {
   planning: boolean;
   plannerLlm: string;
   inputs: CrewInput[];
+  customTools: CustomTool[];
 }
+
+export interface CustomTool {
+  id: string;
+  name: string;
+  description: string;
+  importPath: string;
+  initParams: string;
+  toolType: 'python' | 'mcp';
+  mcpServerUrl: string;
+}
+
+export const DEFAULT_CUSTOM_TOOL: CustomTool = {
+  id: '',
+  name: '',
+  description: '',
+  importPath: '',
+  initParams: '',
+  toolType: 'python',
+  mcpServerUrl: '',
+};
 
 export interface CrewInput {
   name: string;
@@ -103,6 +124,7 @@ export const DEFAULT_CREW_SETTINGS: CrewSettings = {
   planning: false,
   plannerLlm: '',
   inputs: [],
+  customTools: [],
 };
 
 export interface ToolInfo {

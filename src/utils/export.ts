@@ -1,5 +1,5 @@
 import { Node, Edge } from 'reactflow';
-import { AgentData, TaskData, CrewSettings } from '../types';
+import { AgentData, TaskData, CrewSettings, AVAILABLE_TOOLS } from '../types';
 
 export function generateAgentsYaml(nodes: Node[], _edges: Edge[]): string {
   const agents = nodes.filter(n => n.type === 'agent');
@@ -70,20 +70,67 @@ export function generateTasksYaml(nodes: Node[], edges: Edge[]): string {
 export function generatePythonCode(nodes: Node[], edges: Edge[], crewSettings: CrewSettings): string {
   const agents = nodes.filter(n => n.type === 'agent');
 
-  const allTools = new Set<string>();
+  const customTools = crewSettings.customTools || [];
+  const customToolNames = new Set(customTools.filter(t => t.name).map(t => t.name));
+  const builtinNames = new Set(AVAILABLE_TOOLS.map(t => t.name));
+
+  const usedTools = new Set<string>();
   agents.forEach(a => {
     const d = a.data as AgentData;
-    d.tools?.forEach(t => allTools.add(t));
+    d.tools?.forEach(t => usedTools.add(t));
   });
 
-  const toolImports = allTools.size > 0
-    ? `from crewai_tools import ${[...allTools].join(', ')}\n`
+  const usedBuiltin = [...usedTools].filter(t => builtinNames.has(t) && !customToolNames.has(t));
+  const usedCustomPython = customTools.filter(t => t.name && t.toolType === 'python' && usedTools.has(t.name));
+  const usedMcp = customTools.filter(t => t.name && t.toolType === 'mcp' && usedTools.has(t.name));
+
+  const builtinImport = usedBuiltin.length > 0
+    ? `from crewai_tools import ${usedBuiltin.join(', ')}\n`
     : '';
+
+  const customImportsByPath: Record<string, string[]> = {};
+  usedCustomPython.forEach(t => {
+    const path = t.importPath || 'custom_tools';
+    if (!customImportsByPath[path]) customImportsByPath[path] = [];
+    customImportsByPath[path].push(t.name);
+  });
+  const customPythonImports = Object.entries(customImportsByPath)
+    .map(([path, names]) => `from ${path} import ${names.join(', ')}`)
+    .join('\n');
+
+  const mcpImport = usedMcp.length > 0
+    ? `from crewai_tools import MCPServerAdapter\n`
+    : '';
+
+  const mcpSetup = usedMcp.length > 0
+    ? '\n' + usedMcp.map(t => {
+      const varName = t.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+      const isStdio = !t.mcpServerUrl.startsWith('http');
+      if (isStdio) {
+        return `${varName}_tools = MCPServerAdapter(\n    server_params={"command": "${t.mcpServerUrl}"}\n)`;
+      }
+      return `${varName}_tools = MCPServerAdapter(\n    server_params={"url": "${t.mcpServerUrl}"}\n)`;
+    }).join('\n\n') + '\n'
+    : '';
+
+  const toolImports = [builtinImport, mcpImport, customPythonImports].filter(Boolean).join('');
 
   const agentsCode = agents.map(agent => {
     const d = agent.data as AgentData;
     const safeName = d.name?.replace(/\s+/g, '_') || 'unnamed_agent';
-    const toolsList = d.tools?.map(t => `${t}()`).join(', ') || '';
+    const toolParts: string[] = [];
+    d.tools?.forEach(t => {
+      const mcpTool = usedMcp.find(m => m.name === t);
+      if (mcpTool) {
+        const varName = t.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+        toolParts.push(`*${varName}_tools.tools`);
+      } else {
+        const customPy = usedCustomPython.find(c => c.name === t);
+        const initParams = customPy?.initParams ? `(${customPy.initParams})` : '()';
+        toolParts.push(`${t}${initParams}`);
+      }
+    });
+    const toolsList = toolParts.join(', ');
     return `    @agent\n    def ${safeName}(self) -> Agent:\n        return Agent(\n            config=self.agents_config['${safeName}'],\n            verbose=${d.verbose ? 'True' : 'False'},\n            tools=[${toolsList}]\n        )`;
   }).join('\n\n');
 
@@ -141,8 +188,7 @@ ${inputs.map(i => `#     '${i.name}': '${i.defaultValue || `<${i.description || 
 
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
-${toolImports}
-
+${toolImports}${mcpSetup}
 @CrewBase
 class ${className}():
     """${crewSettings.name || 'Generated Crew'}"""

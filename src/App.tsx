@@ -613,6 +613,7 @@ function Flow() {
           selectedNode={selectedNode}
           nodes={nodes}
           edges={edges}
+          customTools={crewSettings.customTools || []}
           onUpdateNodeData={updateNodeData}
           onClose={() => setSelectedNodeId(null)}
         />

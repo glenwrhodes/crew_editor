@@ -12,7 +12,7 @@ import BuildIcon from '@mui/icons-material/Build';
 import TuneIcon from '@mui/icons-material/Tune';
 import LinkIcon from '@mui/icons-material/Link';
 import {
-  AgentData, TaskData, AVAILABLE_TOOLS, AVAILABLE_LLMS, ToolInfo,
+  AgentData, TaskData, CustomTool, AVAILABLE_TOOLS, AVAILABLE_LLMS, ToolInfo,
 } from '../types';
 import { COLORS } from '../theme';
 
@@ -20,6 +20,7 @@ interface PropertiesPanelProps {
   selectedNode: Node | null;
   nodes: Node[];
   edges: Edge[];
+  customTools: CustomTool[];
   onUpdateNodeData: (nodeId: string, data: Partial<AgentData | TaskData>) => void;
   onClose: () => void;
 }
@@ -49,19 +50,32 @@ function AgentProperties({
   data,
   onUpdate,
   connectedTasks,
+  customTools,
 }: {
   data: AgentData;
   onUpdate: (field: string, value: unknown) => void;
   connectedTasks: string[];
+  customTools: CustomTool[];
 }) {
+  const allTools = useMemo(() => {
+    const custom: ToolInfo[] = customTools
+      .filter(t => t.name)
+      .map(t => ({
+        name: t.name,
+        description: t.description || (t.toolType === 'mcp' ? `MCP: ${t.mcpServerUrl}` : 'Custom tool'),
+        category: t.toolType === 'mcp' ? 'MCP Servers' : 'Custom',
+      }));
+    return [...AVAILABLE_TOOLS, ...custom];
+  }, [customTools]);
+
   const groupedTools = useMemo(() => {
     const groups: Record<string, ToolInfo[]> = {};
-    AVAILABLE_TOOLS.forEach(t => {
+    allTools.forEach(t => {
       if (!groups[t.category]) groups[t.category] = [];
       groups[t.category].push(t);
     });
     return groups;
-  }, []);
+  }, [allTools]);
 
   const groupedLlms = useMemo(() => {
     const groups: Record<string, typeof AVAILABLE_LLMS> = {};
@@ -150,10 +164,10 @@ function AgentProperties({
 
       <Autocomplete
         multiple
-        options={AVAILABLE_TOOLS}
+        options={allTools}
         getOptionLabel={(option) => option.name}
         groupBy={(option) => option.category}
-        value={AVAILABLE_TOOLS.filter(t => data.tools?.includes(t.name))}
+        value={allTools.filter(t => data.tools?.includes(t.name))}
         onChange={(_e, newValue) => onUpdate('tools', newValue.map(v => v.name))}
         renderInput={(params) => (
           <TextField {...params} label="Select tools" placeholder="Search tools..." inputProps={{ ...params.inputProps, 'aria-label': 'Select tools' }} />
@@ -200,7 +214,7 @@ function AgentProperties({
 
       {Object.keys(groupedTools).length > 0 && (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-          {AVAILABLE_TOOLS
+          {allTools
             .filter(t => !data.tools?.includes(t.name))
             .slice(0, 8)
             .map(t => (
@@ -493,6 +507,7 @@ export default function PropertiesPanel({
   selectedNode,
   nodes,
   edges,
+  customTools,
   onUpdateNodeData,
   onClose,
 }: PropertiesPanelProps) {
@@ -613,6 +628,7 @@ export default function PropertiesPanel({
             data={nodeData as AgentData}
             onUpdate={handleUpdate}
             connectedTasks={connectionInfo.connectedTasks}
+            customTools={customTools}
           />
         )}
         {nodeType === 'task' && (

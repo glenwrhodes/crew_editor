@@ -8,8 +8,11 @@ import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import InputIcon from '@mui/icons-material/Input';
-import { CrewSettings, CrewInput, AVAILABLE_LLMS } from '../../types';
+import BuildIcon from '@mui/icons-material/Build';
+import ExtensionIcon from '@mui/icons-material/Extension';
+import { CrewSettings, CrewInput, CustomTool, DEFAULT_CUSTOM_TOOL, AVAILABLE_LLMS } from '../../types';
 import { COLORS } from '../../theme';
+import { v4 as uuidv4 } from 'uuid';
 
 interface CrewSettingsModalProps {
   open: boolean;
@@ -214,6 +217,182 @@ export default function CrewSettingsModal({
                   placeholder="e.g. Artificial Intelligence"
                   inputProps={{ 'aria-label': `Input default value ${idx + 1}` }}
                 />
+              </Stack>
+            </Box>
+          ))}
+
+          <Divider />
+
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <BuildIcon sx={{ fontSize: 14, color: COLORS.text.muted }} />
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: COLORS.text.muted,
+                  fontSize: '0.65rem',
+                }}
+              >
+                Custom Tools
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+              onClick={() => {
+                const tools = [...(settings.customTools || []), { ...DEFAULT_CUSTOM_TOOL, id: uuidv4() }];
+                handleChange('customTools', tools);
+              }}
+              aria-label="Add custom tool"
+              sx={{ fontSize: '0.7rem', textTransform: 'none' }}
+            >
+              Add Tool
+            </Button>
+          </Box>
+
+          <Typography variant="caption" sx={{ color: COLORS.text.muted, mt: -1 }}>
+            Define custom Python tools or MCP server tools. They will appear in the agent tool picker alongside built-in tools.
+          </Typography>
+
+          {(settings.customTools || []).map((tool: CustomTool, idx: number) => (
+            <Box
+              key={tool.id || idx}
+              sx={{
+                p: 1.5,
+                borderRadius: '10px',
+                border: `1px solid ${COLORS.surface.border}50`,
+                bgcolor: `${COLORS.surface.elevated}20`,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <ExtensionIcon sx={{ fontSize: 14, color: COLORS.task.primary }} />
+                  <Typography variant="caption" sx={{ color: COLORS.text.muted, fontWeight: 600, fontSize: '0.65rem' }}>
+                    {tool.name || `Custom Tool #${idx + 1}`}
+                  </Typography>
+                </Box>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    const tools = settings.customTools.filter((_: CustomTool, i: number) => i !== idx);
+                    handleChange('customTools', tools);
+                  }}
+                  aria-label={`Remove tool ${tool.name || idx + 1}`}
+                  sx={{ color: COLORS.accent.red, p: 0.25 }}
+                >
+                  <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Box>
+
+              <Stack spacing={1.5}>
+                <Stack direction="row" spacing={1}>
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                    <InputLabel id={`tool-type-${idx}`}>Type</InputLabel>
+                    <Select
+                      labelId={`tool-type-${idx}`}
+                      value={tool.toolType || 'python'}
+                      label="Type"
+                      onChange={(e) => {
+                        const tools = settings.customTools.map((t: CustomTool, i: number) =>
+                          i === idx ? { ...t, toolType: e.target.value } : t
+                        );
+                        handleChange('customTools', tools);
+                      }}
+                      aria-label={`Tool type for tool ${idx + 1}`}
+                    >
+                      <MenuItem value="python">Python</MenuItem>
+                      <MenuItem value="mcp">MCP Server</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    label="Tool Name"
+                    size="small"
+                    fullWidth
+                    value={tool.name}
+                    onChange={(e) => {
+                      const tools = settings.customTools.map((t: CustomTool, i: number) =>
+                        i === idx ? { ...t, name: e.target.value } : t
+                      );
+                      handleChange('customTools', tools);
+                    }}
+                    placeholder="e.g. MyCustomTool"
+                    inputProps={{ 'aria-label': `Tool name ${idx + 1}` }}
+                  />
+                </Stack>
+
+                <TextField
+                  label="Description"
+                  size="small"
+                  fullWidth
+                  value={tool.description}
+                  onChange={(e) => {
+                    const tools = settings.customTools.map((t: CustomTool, i: number) =>
+                      i === idx ? { ...t, description: e.target.value } : t
+                    );
+                    handleChange('customTools', tools);
+                  }}
+                  placeholder="What this tool does"
+                  inputProps={{ 'aria-label': `Tool description ${idx + 1}` }}
+                />
+
+                <Collapse in={tool.toolType === 'python'}>
+                  <Stack spacing={1.5}>
+                    <TextField
+                      label="Import Path"
+                      size="small"
+                      fullWidth
+                      value={tool.importPath}
+                      onChange={(e) => {
+                        const tools = settings.customTools.map((t: CustomTool, i: number) =>
+                          i === idx ? { ...t, importPath: e.target.value } : t
+                        );
+                        handleChange('customTools', tools);
+                      }}
+                      placeholder="e.g. my_tools.custom or crewai_tools"
+                      helperText="Python module path to import from"
+                      inputProps={{ 'aria-label': `Import path for tool ${idx + 1}` }}
+                      FormHelperTextProps={{ sx: { fontSize: '0.6rem' } }}
+                    />
+                    <TextField
+                      label="Init Parameters (optional)"
+                      size="small"
+                      fullWidth
+                      value={tool.initParams}
+                      onChange={(e) => {
+                        const tools = settings.customTools.map((t: CustomTool, i: number) =>
+                          i === idx ? { ...t, initParams: e.target.value } : t
+                        );
+                        handleChange('customTools', tools);
+                      }}
+                      placeholder='e.g. api_key="...", max_results=10'
+                      helperText="Arguments passed to the tool constructor"
+                      inputProps={{ 'aria-label': `Init params for tool ${idx + 1}` }}
+                      FormHelperTextProps={{ sx: { fontSize: '0.6rem' } }}
+                    />
+                  </Stack>
+                </Collapse>
+
+                <Collapse in={tool.toolType === 'mcp'}>
+                  <TextField
+                    label="MCP Server URL"
+                    size="small"
+                    fullWidth
+                    value={tool.mcpServerUrl}
+                    onChange={(e) => {
+                      const tools = settings.customTools.map((t: CustomTool, i: number) =>
+                        i === idx ? { ...t, mcpServerUrl: e.target.value } : t
+                      );
+                      handleChange('customTools', tools);
+                    }}
+                    placeholder="e.g. http://localhost:8000/sse or npx -y @modelcontextprotocol/server-filesystem"
+                    helperText="SSE endpoint URL or stdio command for the MCP server"
+                    inputProps={{ 'aria-label': `MCP server URL for tool ${idx + 1}` }}
+                    FormHelperTextProps={{ sx: { fontSize: '0.6rem' } }}
+                  />
+                </Collapse>
               </Stack>
             </Box>
           ))}
