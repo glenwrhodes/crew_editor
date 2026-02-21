@@ -16,13 +16,10 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^6.3.1",
     "@mui/material": "^6.3.1",
-    "axios": "^1.7.9",
-    "js-yaml": "^4.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "reactflow": "^11.11.4",
-    "uuid": "^11.0.5",
-    "yaml": "^2.7.0"
+    "uuid": "^11.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -38,7 +35,7 @@
     "typescript-eslint": "^8.18.2",
     "vite": "^6.0.5"
   },
-  "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
+  "description": "Visual editor for building CrewAI crews with drag-and-drop agents, tasks, and connections.",
   "main": "eslint.config.js",
   "homepage": "https://glenwrhodes.github.io/crew_editor",
   "keywords": [],

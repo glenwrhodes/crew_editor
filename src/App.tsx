@@ -1,9 +1,10 @@
-import { useState, useCallback, DragEvent, useEffect, useMemo } from 'react';
+import { useState, useCallback, DragEvent, useEffect, useMemo, useRef } from 'react';
 import ReactFlow, {
   Node,
   Edge,
   Controls,
   Background,
+  MiniMap,
   applyEdgeChanges,
   applyNodeChanges,
   NodeChange,
@@ -13,492 +14,517 @@ import ReactFlow, {
   ReactFlowProvider,
   addEdge,
   MarkerType,
-  NodeProps,
+  BackgroundVariant,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { AppBar, Toolbar, Typography, Button, Box, ThemeProvider, createTheme, CssBaseline, Dialog, DialogTitle, DialogContent, TextField, List, ListItem, ListItemText, IconButton, Tooltip } from '@mui/material';
-import TaskNode from './components/TaskNode';
-import AgentNode from './components/AgentNode';
-import Sidebar from './components/Sidebar';
-import BeginNode from './components/BeginNode';
-import RerouteNode from './components/RerouteNode';
-import SaveIcon from '@mui/icons-material/Save';
-import LoadIcon from '@mui/icons-material/FolderOpen';
-import AddIcon from '@mui/icons-material/Add';
-import './App.css';
-import { TaskData } from './components/TaskNode';
-import { AgentData } from './components/AgentNode';
+import { ThemeProvider, CssBaseline, Box } from '@mui/material';
 import { v4 as uuidv4 } from 'uuid';
+
+import theme, { COLORS } from './theme';
+import {
+  AgentData, TaskData, CrewSettings, SavedGraph, SavedAgent, SavedTask,
+  DEFAULT_AGENT_DATA, DEFAULT_TASK_DATA, DEFAULT_CREW_SETTINGS, migrateNodeData,
+} from './types';
+import { generateAgentsYaml, generateTasksYaml, generatePythonCode } from './utils/export';
+import useUndoRedo from './hooks/useUndoRedo';
+
+import AgentNode from './components/nodes/AgentNode';
+import TaskNode from './components/nodes/TaskNode';
+import BeginNode from './components/nodes/BeginNode';
+import RerouteNode from './components/nodes/RerouteNode';
+import Toolbar from './components/Toolbar';
+import Sidebar from './components/Sidebar';
+import PropertiesPanel from './components/PropertiesPanel';
+import ConfirmModal from './components/modals/ConfirmModal';
+import ExportModal from './components/modals/ExportModal';
+import SaveModal from './components/modals/SaveModal';
+import LoadModal from './components/modals/LoadModal';
+import CrewSettingsModal from './components/modals/CrewSettingsModal';
+import './App.css';
 
 const getId = () => `node_${uuidv4()}`;
 
-// Define Agent and Task types to match Sidebar's requirements
-interface Agent extends AgentData {
-  name: string;
-}
-
-interface Task extends TaskData {
-  name: string;
-}
+const nodeTypes = {
+  task: TaskNode,
+  agent: AgentNode,
+  begin: BeginNode,
+  reroute: RerouteNode,
+};
 
 function Flow() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [yamlDialogOpen, setYamlDialogOpen] = useState(false);
-  const [yamlContent, setYamlContent] = useState('');
-  const [pythonDialogOpen, setPythonDialogOpen] = useState(false);
-  const [pythonContent, setPythonContent] = useState('');
-  const [graphName, setGraphName] = useState('');
-  const [savedGraphs, setSavedGraphs] = useState<{ name: string; nodes: Node[]; edges: Edge[]; graphName: string }[]>([]);
-  const { project } = useReactFlow();
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [crewSettings, setCrewSettings] = useState<CrewSettings>({ ...DEFAULT_CREW_SETTINGS });
   const [activeGraphTitle, setActiveGraphTitle] = useState('Untitled');
-  const [selectedGraphName, setSelectedGraphName] = useState('');
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [savedAgents, setSavedAgents] = useState<Agent[]>([]);
-  const [savedTasks, setSavedTasks] = useState<Task[]>([]);
+  const [savedGraphs, setSavedGraphs] = useState<SavedGraph[]>([]);
+  const [savedAgents, setSavedAgents] = useState<SavedAgent[]>([]);
+  const [savedTasks, setSavedTasks] = useState<SavedTask[]>([]);
 
-  const nodeTypes = useMemo(() => ({
-    task: (props: NodeProps<TaskData>) => <TaskNode {...props} onSave={() => {}} updateSavedTasks={(tasks) => setSavedTasks(tasks as Task[])} />,
-    agent: (props: NodeProps<AgentData>) => <AgentNode {...props} onSave={() => {}} updateSavedAgents={(agents) => setSavedAgents(agents as Agent[])} />,
-    begin: BeginNode,
-    reroute: RerouteNode,
-  }), [setSavedTasks, setSavedAgents]);
+  // Modal states
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [loadModalOpen, setLoadModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportMode, setExportMode] = useState<'yaml' | 'python'>('yaml');
+  const [crewSettingsOpen, setCrewSettingsOpen] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({ open: false, title: '', message: '', variant: 'warning', onConfirm: () => {} });
 
+  const { project } = useReactFlow();
+  const { takeSnapshot, undo, redo, canUndo, canRedo, clear: clearHistory } = useUndoRedo();
+  const snapshotTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced snapshot for node data changes
+  const debouncedSnapshot = useCallback(() => {
+    if (snapshotTimeoutRef.current) clearTimeout(snapshotTimeoutRef.current);
+    snapshotTimeoutRef.current = setTimeout(() => {
+      setNodes(currentNodes => {
+        setEdges(currentEdges => {
+          takeSnapshot(currentNodes, currentEdges);
+          return currentEdges;
+        });
+        return currentNodes;
+      });
+    }, 500);
+  }, [takeSnapshot]);
+
+  // Load persisted data on mount
   useEffect(() => {
-    const saved = localStorage.getItem('savedGraphs');
-    if (saved) {
-      setSavedGraphs(JSON.parse(saved));
-    }
+    try {
+      const graphs = JSON.parse(localStorage.getItem('savedGraphs') || '[]');
+      setSavedGraphs(graphs);
+    } catch { /* ignore */ }
+    try {
+      const agents = JSON.parse(localStorage.getItem('savedAgents') || '[]');
+      setSavedAgents(agents);
+    } catch { /* ignore */ }
+    try {
+      const tasks = JSON.parse(localStorage.getItem('savedTasks') || '[]');
+      setSavedTasks(tasks);
+    } catch { /* ignore */ }
   }, []);
 
-  const saveGraph = () => {
-    if (!graphName) return alert('Please enter a name for the file.');
-    const newGraph = { name: graphName, nodes, edges, graphName: activeGraphTitle };
-    const updatedGraphs = [...savedGraphs.filter(g => g.name !== graphName), newGraph];
-    setSavedGraphs(updatedGraphs);
-    localStorage.setItem('savedGraphs', JSON.stringify(updatedGraphs));
-  };
-
-  const loadGraph = (name: string) => {
-    const graph = savedGraphs.find(g => g.name === name);
-    if (graph) {
-      setNodes(graph.nodes);
-      setEdges(graph.edges);
-      setActiveGraphTitle(graph.graphName);
-    }
-  };
-
-  const onNodesChange = useCallback(
-    (changes: NodeChange[]) => {
-      setNodes((nds) => applyNodeChanges(changes, nds));
-      // Implement a different approach to track selected nodes
-    },
-    []
+  const selectedNode = useMemo(
+    () => nodes.find(n => n.id === selectedNodeId) || null,
+    [nodes, selectedNodeId]
   );
 
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (event.key === 'Delete' && selectedNodeId) {
-      setNodes((nds) => nds.filter(node => node.id !== selectedNodeId));
-      // Remove any edges connected to the deleted node
-      setEdges((eds) => eds.filter(edge => 
-        edge.source !== selectedNodeId && edge.target !== selectedNodeId
+  // Node & edge change handlers
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    const hasStructuralChange = changes.some(
+      c => c.type === 'remove' || c.type === 'add'
+    );
+    if (hasStructuralChange) {
+      setNodes(nds => {
+        setEdges(eds => {
+          takeSnapshot(nds, eds);
+          return eds;
+        });
+        return nds;
+      });
+    }
+    setNodes(nds => applyNodeChanges(changes, nds));
+  }, [takeSnapshot]);
+
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    const hasStructuralChange = changes.some(c => c.type === 'remove' || c.type === 'add');
+    if (hasStructuralChange) {
+      setNodes(nds => {
+        setEdges(eds => {
+          takeSnapshot(nds, eds);
+          return eds;
+        });
+        return nds;
+      });
+    }
+    setEdges(eds => applyEdgeChanges(changes, eds));
+  }, [takeSnapshot]);
+
+  const onSelectionChange = useCallback(({ nodes: selectedNodes }: { nodes: Node[] }) => {
+    setSelectedNodeId(selectedNodes.length === 1 ? selectedNodes[0].id : null);
+  }, []);
+
+  // Connection logic
+  const onConnect = useCallback((params: Connection) => {
+    const sourceNode = nodes.find(n => n.id === params.source);
+    const targetNode = nodes.find(n => n.id === params.target);
+    if (!sourceNode || !targetNode || !params.source || !params.target) return;
+
+    // Handle reroute node type claiming
+    if (targetNode.type === 'reroute' && !targetNode.data.claimedType) {
+      const isExec = sourceNode.type === 'begin' ||
+        (sourceNode.type === 'task' && params.sourceHandle === 'exec-out') ||
+        (sourceNode.type === 'reroute' && sourceNode.data.claimedType === 'execution');
+      const isAgent = sourceNode.type === 'agent' ||
+        (sourceNode.type === 'reroute' && sourceNode.data.claimedType === 'agent');
+
+      if (isExec || isAgent) {
+        setNodes(nds => nds.map(n =>
+          n.id === targetNode.id
+            ? { ...n, data: { ...n.data, claimedType: isExec ? 'execution' : 'agent' } }
+            : n
+        ));
+      }
+    }
+
+    const isValid =
+      (sourceNode.type === 'agent' && targetNode.type === 'task' && params.targetHandle === 'agent') ||
+      (sourceNode.type === 'task' && targetNode.type === 'task' && params.targetHandle === 'exec-in') ||
+      (sourceNode.type === 'begin' && targetNode.type === 'task' && params.targetHandle === 'exec-in') ||
+      targetNode.type === 'reroute' ||
+      (sourceNode.type === 'reroute' && (
+        (sourceNode.data.claimedType === 'execution' && params.targetHandle === 'exec-in') ||
+        (sourceNode.data.claimedType === 'agent' && params.targetHandle === 'agent')
       ));
-      setSelectedNodeId(null);
-    }
-  }, [selectedNodeId]);
 
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+    if (!isValid) return;
+
+    takeSnapshot(nodes, edges);
+
+    const isExecLine = params.targetHandle === 'exec-in' ||
+      (sourceNode.data?.claimedType === 'execution' && targetNode.type === 'reroute') ||
+      (sourceNode.type === 'reroute' && sourceNode.data?.claimedType === 'execution') ||
+      sourceNode.type === 'begin';
+
+    const isAgentLine = params.targetHandle === 'agent' ||
+      sourceNode.type === 'agent' ||
+      (sourceNode.data?.claimedType === 'agent');
+
+    const edgeColor = isAgentLine ? COLORS.agent.primary : COLORS.text.muted;
+
+    const edgeStyle = {
+      strokeDasharray: isExecLine ? '6,4' : 'none',
+      stroke: edgeColor,
+      strokeWidth: 2,
     };
-  }, [handleKeyDown]);
 
-  const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
-    []
-  );
+    const edgeMarker = {
+      type: MarkerType.ArrowClosed,
+      color: edgeColor,
+      width: 16,
+      height: 16,
+    };
 
-  const onConnect = useCallback(
-    (params: Connection) => {
-      const sourceNode = nodes.find(n => n.id === params.source);
-      const targetNode = nodes.find(n => n.id === params.target);
-      
-      if (!sourceNode || !targetNode || !params.source || !params.target) return;
+    if (sourceNode.type === 'reroute') {
+      const newEdge: Edge = {
+        id: getId(),
+        source: sourceNode.id,
+        target: targetNode.id,
+        sourceHandle: params.sourceHandle || undefined,
+        targetHandle: params.targetHandle || undefined,
+        type: 'default',
+        animated: isExecLine,
+        style: edgeStyle,
+        markerEnd: edgeMarker,
+      };
+      setEdges(eds => [...eds, newEdge]);
+    } else {
+      setEdges(eds => addEdge({
+        ...params,
+        type: 'default',
+        animated: isExecLine,
+        style: edgeStyle,
+        markerEnd: edgeMarker,
+      }, eds));
+    }
+  }, [nodes, edges, takeSnapshot]);
 
-      // Handle reroute node type claiming
-      if (targetNode.type === 'reroute') {
-        const isExecutionConnection = sourceNode.type === 'begin' || 
-          (sourceNode.type === 'task' && params.sourceHandle === 'exec-out');
-        const isAgentConnection = sourceNode.type === 'agent' || 
-          (sourceNode.type === 'task' && params.sourceHandle === 'agent-out');
-
-        // Update reroute node type if not already claimed
-        if (!targetNode.data.claimedType) {
-          setNodes(nds => nds.map(node => {
-            if (node.id === targetNode.id) {
-              return {
-                ...node,
-                data: {
-                  ...node.data,
-                  claimedType: isExecutionConnection ? 'execution' : isAgentConnection ? 'agent' : undefined
-                }
-              };
-            }
-            return node;
-          }));
-        }
-      }
-
-      // Define valid connections
-      const isValid = (
-        // Agent can connect to Task's agent input
-        (sourceNode.type === 'agent' && targetNode.type === 'task' && params.targetHandle === 'agent') ||
-        // Task can connect to Task's execution input
-        (sourceNode.type === 'task' && targetNode.type === 'task' && params.targetHandle === 'exec-in') ||
-        // Begin can connect to Task's execution input
-        (sourceNode.type === 'begin' && targetNode.type === 'task' && params.targetHandle === 'exec-in') ||
-        // Any node can connect to reroute node
-        (targetNode.type === 'reroute') ||
-        // Reroute node can connect to matching type inputs
-        (sourceNode.type === 'reroute' && (
-          (sourceNode.data.claimedType === 'execution' && params.targetHandle === 'exec-in') ||
-          (sourceNode.data.claimedType === 'agent' && params.targetHandle === 'agent')
-        ))
-      );
-      
-      if (isValid) {
-        const isExecutionLine = params.targetHandle === 'exec-in' || 
-          (sourceNode.data?.claimedType === 'execution' && targetNode.type === 'reroute') ||
-          (sourceNode.type === 'reroute' && sourceNode.data?.claimedType === 'execution');
-
-        const edgeStyle = {
-          strokeDasharray: isExecutionLine ? '5,5' : 'none',
-          stroke: isExecutionLine ? 'white' : 'yellow',
-          strokeWidth: 2,
-        };
-
-        const edgeMarker = {
-          type: MarkerType.ArrowClosed,
-          color: isExecutionLine ? 'white' : 'yellow',
-          width: 20,
-          height: 20,
-        };
-
-        // For reroute nodes, preserve existing connections and add the new one
-        if (sourceNode.type === 'reroute') {
-          setEdges(eds => {
-            // Keep all existing connections when adding a new one from a reroute node
-            const newConnection: Edge = {
-              id: getId(),
-              source: sourceNode.id,
-              target: targetNode.id,
-              sourceHandle: params.sourceHandle || undefined,
-              targetHandle: params.targetHandle || undefined,
-              type: 'default',
-              animated: isExecutionLine,
-              style: edgeStyle,
-              markerEnd: edgeMarker,
-            };
-            return [...eds, newConnection];
-          });
-        } else {
-          setEdges((eds) => addEdge({
-            ...params,
-            type: 'default',
-            animated: isExecutionLine,
-            style: edgeStyle,
-            markerEnd: edgeMarker,
-          }, eds));
-        }
-      }
-    },
-    [nodes]
-  );
-
+  // Drag & drop
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  const onChange = (nodeId: string, field: string, value: string) => {
-    setNodes(nds => 
-      nds.map(node => {
-        if (node.id === nodeId) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              [field]: value,
-            },
-          };
-        }
-        return node;
-      })
-    );
-  };
+  const onDrop = useCallback((event: DragEvent) => {
+    event.preventDefault();
+    const type = event.dataTransfer.getData('application/reactflow');
+    if (!type) return;
 
-  const onDrop = useCallback(
-    (event: DragEvent) => {
-      event.preventDefault();
-
-      const type = event.dataTransfer.getData('application/reactflow');
-      if (!type) return;
-
+    let nodeData: Record<string, unknown> = {};
+    try {
       const savedData = event.dataTransfer.getData('savedData');
-      const nodeData = savedData ? JSON.parse(savedData) : {};
-      console.log('Loading Node Data:', nodeData);
+      if (savedData) nodeData = JSON.parse(savedData);
+    } catch { /* ignore */ }
 
-      const position = project({
-        x: event.clientX - 200,  // Adjust for sidebar width
-        y: event.clientY - 64,   // Adjust for header height
-      });
-
-      const newNode: Node = {
-        id: getId(),
-        type,
-        position,
-        data: { 
-          ...nodeData,
-          label: nodeData.label || `${type.charAt(0).toUpperCase() + type.slice(1)}`,
-          onChange: (field: string, value: string) => onChange(newNode.id, field, value),
-          onExecute: type === 'execution' ? handleRunCrew : undefined
-        },
-      };
-
-      setNodes((nds) => [...nds, newNode]);
-    },
-    [project]
-  );
-
-  const handleRunCrew = () => {
-    // Get all tasks and their connections
-    const tasks = nodes.filter(n => n.type === 'task');
-    const taskConnections = edges.filter(e => {
-      const source = nodes.find(n => n.id === e.source);
-      const target = nodes.find(n => n.id === e.target);
-      return source?.type === 'task' && target?.type === 'task';
+    const position = project({
+      x: event.clientX - 240,
+      y: event.clientY - 48,
     });
 
-    // Get agent assignments
-    const agentAssignments = edges.filter(e => {
-      const source = nodes.find(n => n.id === e.source);
-      const target = nodes.find(n => n.id === e.target);
-      return source?.type === 'agent' && target?.type === 'task';
-    });
+    takeSnapshot(nodes, edges);
 
-    console.log('Running crew...', {
-      tasks: tasks.map(t => ({
-        id: t.id,
-        ...t.data
-      })),
-      taskFlow: taskConnections,
-      agentAssignments: agentAssignments.map(a => ({
-        agentId: a.source,
-        taskId: a.target
-      }))
-    });
-  };
-
-  const handleYamlExport = () => {
-    const agentsYaml = nodes.filter(n => n.type === 'agent').map(agent => {
-      const { name, role, goal, backstory } = agent.data;
-      return `${name}:
-  role: >
-    ${role}
-  goal: >
-    ${goal}
-  backstory: >
-    ${backstory}`;
-    }).join('\n\n');
-
-    const tasksYaml = nodes.filter(n => n.type === 'task').map(task => {
-      const { name, description, expected_output } = task.data;
-      const connectedAgent = edges.find(e => e.target === task.id && nodes.find(n => n.id === e.source)?.type === 'agent');
-      const agentName = connectedAgent ? nodes.find(n => n.id === connectedAgent.source)?.data.name : 'None';
-      return `${name}:
-  description: >
-    ${description}
-  expected_output: >
-    ${expected_output}
-  agent: ${agentName}`;
-    }).join('\n\n');
-
-    setYamlContent(`Agents:\n\n${agentsYaml}\n\nTasks:\n\n${tasksYaml}`);
-    setYamlDialogOpen(true);
-  };
-
-  const handlePythonExport = () => {
-    const agentsCode = nodes.filter(n => n.type === 'agent').map(agent => {
-      const { name, tools } = agent.data;
-      const safeName = name?.replace(/\s+/g, '_');
-      const toolsArray = tools ? tools.split(',').map((tool: string) => tool.trim()).filter((tool: string) => tool.length > 0) : [];
-      const toolsCode = toolsArray.map((tool: string) => `${tool}()`).join(', ');
-      return `@agent\ndef ${safeName}() -> Agent:\n    return Agent(\n        config=self.agents_config['${name}'],\n        verbose=True,\n        tools=[${toolsCode}]\n    )`;
-    }).join('\n\n');
-
-    const getTaskOrder = () => {
-      const beginNode = nodes.find(n => n.type === 'begin');
-      if (!beginNode) return [];
-
-      const orderedTasks: string[] = [];
-      const visited = new Set<string>();
-
-      const dfs = (nodeId: string) => {
-        if (visited.has(nodeId)) return;
-        visited.add(nodeId);
-
-        const outgoingEdges = edges.filter(e => e.source === nodeId && nodes.find(n => n.id === e.target)?.type === 'task');
-        outgoingEdges.forEach(edge => {
-          const targetNode = nodes.find(n => n.id === edge.target);
-          if (targetNode && targetNode.type === 'task') {
-            orderedTasks.push(targetNode.data.name?.replace(/\s+/g, '_') || '');
-            dfs(targetNode.id);
-          }
-        });
-      };
-
-      dfs(beginNode.id);
-
-      // Add unconnected tasks at the end
-      const unconnectedTasks = nodes.filter(n => n.type === 'task' && !visited.has(n.id)).map(n => n.data.name?.replace(/\s+/g, '_') || '');
-      return [...orderedTasks, ...unconnectedTasks];
+    const defaults = type === 'agent' ? { ...DEFAULT_AGENT_DATA } : type === 'task' ? { ...DEFAULT_TASK_DATA } : {};
+    const newNode: Node = {
+      id: getId(),
+      type,
+      position,
+      data: { ...defaults, ...nodeData },
     };
 
-    const taskOrder = getTaskOrder();
+    setNodes(nds => [...nds, newNode]);
+    setSelectedNodeId(newNode.id);
+  }, [project, nodes, edges, takeSnapshot]);
 
-    const tasksCode = taskOrder.map(safeName => {
-      const taskNode = nodes.find(n => n.data.name?.replace(/\s+/g, '_') === safeName);
-      if (!taskNode) return '';
+  // Update node data from properties panel
+  const updateNodeData = useCallback((nodeId: string, data: Partial<AgentData | TaskData>) => {
+    setNodes(nds => nds.map(n =>
+      n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n
+    ));
+    debouncedSnapshot();
+  }, [debouncedSnapshot]);
 
-      const contextTasks = edges
-        .filter(e => e.target === taskNode.id && nodes.find(n => n.id === e.source)?.type === 'task')
-        .map(e => nodes.find(n => n.id === e.source)?.data.name?.replace(/\s+/g, '_'))
-        .filter((name): name is string => !!name);
-      const contextCode = contextTasks.length > 0 ? `,\n        context=[${contextTasks.map(ct => `self.${ct}()`).join(', ')}]` : '';
-      return `@task\ndef ${safeName}() -> Task:\n    return Task(\n        config=self.tasks_config['${taskNode.data.name}'],\n        output_file='${safeName}.md'${contextCode}\n    )`;
-    }).join('\n\n');
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
-    const crewCode = `@crew\ndef crew() -> Crew:\n    return Crew(\n        agents=self.agents,\n        tasks=self.tasks,\n        process=Process.sequential,\n        verbose=True\n    )`;
+      if (e.key === 'Delete' && !isInput && selectedNodeId) {
+        takeSnapshot(nodes, edges);
+        setNodes(nds => nds.filter(n => n.id !== selectedNodeId));
+        setEdges(eds => eds.filter(e => e.source !== selectedNodeId && e.target !== selectedNodeId));
+        setSelectedNodeId(null);
+        return;
+      }
 
-    setPythonContent(`# Generated crew.py\n\nfrom crewai import Agent, Crew, Process, Task\nfrom crewai.project import CrewBase, agent, crew, task, before_kickoff\nimport os\n\n@CrewBase\nclass GeneratedCrew():\n    agents_config = 'config/agents.yaml'\n    tasks_config = 'config/tasks.yaml'\n\n${agentsCode}\n\n${tasksCode}\n\n${crewCode}`);
-    setPythonDialogOpen(true);
-  };
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        setSaveModalOpen(true);
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && !isInput) {
+        e.preventDefault();
+        handleDuplicate();
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        setSelectedNodeId(null);
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  });
+
+  // Undo/Redo handlers
+  const handleUndo = useCallback(() => {
+    const state = undo(nodes, edges);
+    if (state) {
+      setNodes(state.nodes);
+      setEdges(state.edges);
+    }
+  }, [nodes, edges, undo]);
+
+  const handleRedo = useCallback(() => {
+    const state = redo(nodes, edges);
+    if (state) {
+      setNodes(state.nodes);
+      setEdges(state.edges);
+    }
+  }, [nodes, edges, redo]);
+
+  // Duplicate selected node
+  const handleDuplicate = useCallback(() => {
+    if (!selectedNodeId) return;
+    const node = nodes.find(n => n.id === selectedNodeId);
+    if (!node || node.type === 'begin') return;
+
+    takeSnapshot(nodes, edges);
+
+    const newNode: Node = {
+      ...node,
+      id: getId(),
+      position: { x: node.position.x + 30, y: node.position.y + 30 },
+      data: { ...node.data },
+      selected: false,
+    };
+
+    setNodes(nds => [...nds, newNode]);
+    setSelectedNodeId(newNode.id);
+  }, [selectedNodeId, nodes, edges, takeSnapshot]);
+
+  // Save node as template
+  const handleSaveSelectedNode = useCallback(() => {
+    if (!selectedNode) return;
+
+    if (selectedNode.type === 'agent') {
+      const data = selectedNode.data as AgentData;
+      if (!data.name) return;
+      const newAgent: SavedAgent = { ...data, id: uuidv4() };
+      const updated = [...savedAgents.filter(a => a.name !== data.name), newAgent];
+      setSavedAgents(updated);
+      localStorage.setItem('savedAgents', JSON.stringify(updated));
+    } else if (selectedNode.type === 'task') {
+      const data = selectedNode.data as TaskData;
+      if (!data.name) return;
+      const newTask: SavedTask = { ...data, id: uuidv4() };
+      const updated = [...savedTasks.filter(t => t.name !== data.name), newTask];
+      setSavedTasks(updated);
+      localStorage.setItem('savedTasks', JSON.stringify(updated));
+    }
+  }, [selectedNode, savedAgents, savedTasks]);
+
+  // Graph operations
+  const handleNew = useCallback(() => {
+    if (nodes.length === 0 && edges.length === 0) return;
+    setConfirmModal({
+      open: true,
+      title: 'New Crew',
+      message: 'This will clear the current canvas. Any unsaved changes will be lost.',
+      variant: 'warning',
+      onConfirm: () => {
+        setNodes([]);
+        setEdges([]);
+        setActiveGraphTitle('Untitled');
+        setCrewSettings({ ...DEFAULT_CREW_SETTINGS });
+        setSelectedNodeId(null);
+        clearHistory();
+        setConfirmModal(prev => ({ ...prev, open: false }));
+      },
+    });
+  }, [nodes, edges, clearHistory]);
+
+  const handleSave = useCallback((name: string) => {
+    const newGraph: SavedGraph = {
+      name,
+      nodes,
+      edges,
+      graphName: activeGraphTitle,
+      crewSettings,
+      savedAt: new Date().toISOString(),
+    };
+    const updated = [...savedGraphs.filter(g => g.name !== name), newGraph];
+    setSavedGraphs(updated);
+    localStorage.setItem('savedGraphs', JSON.stringify(updated));
+  }, [nodes, edges, activeGraphTitle, crewSettings, savedGraphs]);
+
+  const handleLoad = useCallback((name: string) => {
+    const graph = savedGraphs.find(g => g.name === name);
+    if (!graph) return;
+    const migratedNodes = graph.nodes.map(migrateNodeData);
+    setNodes(migratedNodes);
+    setEdges(graph.edges);
+    setActiveGraphTitle(graph.graphName || 'Untitled');
+    setCrewSettings(graph.crewSettings || { ...DEFAULT_CREW_SETTINGS });
+    setSelectedNodeId(null);
+    clearHistory();
+  }, [savedGraphs, clearHistory]);
+
+  const handleDeleteGraph = useCallback((name: string) => {
+    const updated = savedGraphs.filter(g => g.name !== name);
+    setSavedGraphs(updated);
+    localStorage.setItem('savedGraphs', JSON.stringify(updated));
+  }, [savedGraphs]);
+
+  const handleDeleteAgent = useCallback((id: string) => {
+    const updated = savedAgents.filter(a => a.id !== id);
+    setSavedAgents(updated);
+    localStorage.setItem('savedAgents', JSON.stringify(updated));
+  }, [savedAgents]);
+
+  const handleDeleteTask = useCallback((id: string) => {
+    const updated = savedTasks.filter(t => t.id !== id);
+    setSavedTasks(updated);
+    localStorage.setItem('savedTasks', JSON.stringify(updated));
+  }, [savedTasks]);
+
+  // Export
+  const agentsYaml = useMemo(() => generateAgentsYaml(nodes, edges), [nodes, edges]);
+  const tasksYaml = useMemo(() => generateTasksYaml(nodes, edges), [nodes, edges]);
+  const pythonCode = useMemo(() => generatePythonCode(nodes, edges, crewSettings), [nodes, edges, crewSettings]);
+
+  // Edge double-click: insert reroute node
+  const onEdgeDoubleClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
+    const rerouteId = getId();
+    const sourceNode = nodes.find(n => n.id === edge.source);
+    const targetNode = nodes.find(n => n.id === edge.target);
+    if (!sourceNode || !targetNode) return;
+
+    takeSnapshot(nodes, edges);
+
+    const pos = {
+      x: (sourceNode.position.x + targetNode.position.x) / 2,
+      y: (sourceNode.position.y + targetNode.position.y) / 2,
+    };
+
+    const isExecEdge = edge.animated || edge.style?.strokeDasharray;
+    const claimedType = isExecEdge ? 'execution' : 'agent';
+
+    setNodes(nds => [...nds, {
+      id: rerouteId,
+      type: 'reroute',
+      position: pos,
+      data: { claimedType },
+      draggable: true,
+    }]);
+
+    setEdges(eds => eds.flatMap(e => {
+      if (e.id === edge.id) {
+        return [
+          { ...e, id: getId(), target: rerouteId, targetHandle: undefined },
+          { ...e, id: getId(), source: rerouteId, sourceHandle: undefined },
+        ];
+      }
+      return e;
+    }));
+  }, [nodes, edges, takeSnapshot]);
 
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
   }, []);
 
-  const onEdgeDoubleClick = useCallback((event: React.MouseEvent, edge: Edge) => {
-    event.preventDefault();
-
-    const rerouteNodeId = getId();
-    const rerouteNodePosition = project({
-      x: event.clientX,
-      y: event.clientY,
-    });
-
-    const rerouteNode: Node = {
-      id: rerouteNodeId,
-      type: 'reroute',
-      position: rerouteNodePosition,
-      data: {},
-      draggable: true,
-      style: {
-        width: 10,
-        height: 10,
-        backgroundColor: 'gray',
-        borderRadius: '50%',
-      },
-    };
-
-    setNodes((nds) => [...nds, rerouteNode]);
-
-    setEdges((eds) => eds.flatMap((e) => {
-      if (e.id === edge.id) {
-        return [
-          { ...e, target: rerouteNodeId },
-          { ...e, id: getId(), source: rerouteNodeId, target: e.target },
-        ];
-      }
-      return e;
-    }));
-  }, [setNodes, setEdges, project]);
-
   const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
   }, []);
 
-  const onPaneMouseDown = useCallback((event: React.MouseEvent) => {
-    if (event.button !== 2) return; // Only allow right-click drag
-    event.preventDefault();
-    // Start custom drag logic here
-  }, []);
-
-  const onPaneMouseUp = useCallback((event: React.MouseEvent) => {
-    if (event.button !== 2) return; // Only handle right-click release
-    event.preventDefault();
-    // End custom drag logic here
-  }, []);
-
-  const newGraph = () => {
-    setNodes([]);
-    setEdges([]);
-    setActiveGraphTitle('Untitled');
-  };
-
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            {isEditingTitle ? (
-              <TextField
-                value={activeGraphTitle}
-                onChange={(e) => setActiveGraphTitle(e.target.value)}
-                onBlur={() => setIsEditingTitle(false)}
-                autoFocus
-                sx={{ width: '100%' }}
-              />
-            ) : (
-              <span onClick={() => setIsEditingTitle(true)} style={{ cursor: 'pointer' }}>
-                {activeGraphTitle} - CrewAI Visual Editor
-              </span>
-            )}
-          </Typography>
-          <Tooltip title="New Graph">
-            <IconButton color="inherit" onClick={newGraph} sx={{ mr: 2 }}>
-              <AddIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="YAML Export">
-            <Button color="inherit" onClick={handleYamlExport} sx={{ mr: 2 }}>
-              YAML Export
-            </Button>
-          </Tooltip>
-          <Tooltip title="Python Export">
-            <Button color="inherit" onClick={handlePythonExport} sx={{ mr: 2 }}>
-              Python Export
-            </Button>
-          </Tooltip>
-          <Tooltip title="Save Graph">
-            <Button color="inherit" onClick={() => setSaveDialogOpen(true)} sx={{ mr: 2 }}>
-              <SaveIcon />
-            </Button>
-          </Tooltip>
-          <Tooltip title="Load Graph">
-            <Button color="inherit" onClick={() => setLoadDialogOpen(true)} sx={{ mr: 2 }}>
-              <LoadIcon />
-            </Button>
-          </Tooltip>
-        </Toolbar>
-      </AppBar>
-      <Box sx={{ display: 'flex', flexGrow: 1 }}>
-        <Sidebar savedAgents={savedAgents} savedTasks={savedTasks} setSavedAgents={setSavedAgents} setSavedTasks={setSavedTasks} />
-        <Box sx={{ flexGrow: 1 }}>
+    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: COLORS.surface.bg }}>
+      <Toolbar
+        graphTitle={activeGraphTitle}
+        onTitleChange={setActiveGraphTitle}
+        onNew={handleNew}
+        onSave={() => setSaveModalOpen(true)}
+        onLoad={() => setLoadModalOpen(true)}
+        onExportYaml={() => { setExportMode('yaml'); setExportModalOpen(true); }}
+        onExportPython={() => { setExportMode('python'); setExportModalOpen(true); }}
+        onCrewSettings={() => setCrewSettingsOpen(true)}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onSaveSelectedNode={handleSaveSelectedNode}
+        hasSelectedNode={!!selectedNode && (selectedNode.type === 'agent' || selectedNode.type === 'task')}
+        onDuplicate={handleDuplicate}
+      />
+
+      <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
+        <Sidebar
+          savedAgents={savedAgents}
+          savedTasks={savedTasks}
+          onDeleteAgent={handleDeleteAgent}
+          onDeleteTask={handleDeleteTask}
+        />
+
+        <Box sx={{ flexGrow: 1, position: 'relative' }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -509,134 +535,106 @@ function Flow() {
             onDrop={onDrop}
             onPaneClick={onPaneClick}
             onPaneContextMenu={onPaneContextMenu}
-            onMouseDown={onPaneMouseDown}
-            onMouseUp={onPaneMouseUp}
             onEdgeDoubleClick={onEdgeDoubleClick}
+            onSelectionChange={onSelectionChange}
             nodeTypes={nodeTypes}
             fitView
+            snapToGrid
+            snapGrid={[15, 15]}
+            deleteKeyCode="Delete"
+            multiSelectionKeyCode="Shift"
           >
-            <Background />
-            <Controls />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={20}
+              size={1}
+              color={COLORS.surface.border + '40'}
+            />
+            <Controls
+              showInteractive={false}
+              style={{
+                borderRadius: 10,
+                overflow: 'hidden',
+                border: `1px solid ${COLORS.surface.border}`,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              }}
+            />
+            <MiniMap
+              nodeColor={(node) => {
+                if (node.type === 'agent') return COLORS.agent.primary;
+                if (node.type === 'task') return COLORS.task.primary;
+                if (node.type === 'begin') return COLORS.begin.primary;
+                return COLORS.text.muted;
+              }}
+              maskColor={`${COLORS.surface.bg}cc`}
+              style={{
+                borderRadius: 10,
+                overflow: 'hidden',
+                border: `1px solid ${COLORS.surface.border}`,
+                backgroundColor: COLORS.surface.paper,
+              }}
+            />
           </ReactFlow>
         </Box>
+
+        <PropertiesPanel
+          selectedNode={selectedNode}
+          nodes={nodes}
+          edges={edges}
+          onUpdateNodeData={updateNodeData}
+          onClose={() => setSelectedNodeId(null)}
+        />
       </Box>
-      <Dialog open={yamlDialogOpen} onClose={() => setYamlDialogOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>YAML Export</DialogTitle>
-        <DialogContent>
-          <TextField
-            multiline
-            fullWidth
-            rows={20}
-            value={yamlContent}
-            variant="outlined"
-            InputProps={{ readOnly: true }}
-          />
-        </DialogContent>
-      </Dialog>
-      <Dialog open={pythonDialogOpen} onClose={() => setPythonDialogOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>Python Export</DialogTitle>
-        <DialogContent>
-          <TextField
-            multiline
-            fullWidth
-            rows={20}
-            value={pythonContent}
-            variant="outlined"
-            InputProps={{ readOnly: true }}
-          />
-        </DialogContent>
-      </Dialog>
-      <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Save File</DialogTitle>
-        <DialogContent>
-          <TextField
-            label="File Name"
-            variant="outlined"
-            fullWidth
-            value={graphName}
-            onChange={(e) => setGraphName(e.target.value)}
-            sx={{ mb: 2 }}
-          />
-          <List>
-            {savedGraphs.map((graph) => (
-              <ListItem key={graph.name} component="div">
-                <ListItemText primary={graph.name} />
-                <IconButton edge="end" aria-label="overwrite" onClick={() => {
-                  if (window.confirm(`Overwrite ${graph.name}?`)) {
-                    saveGraph();
-                    setSaveDialogOpen(false);
-                  }
-                }}>
-                  <SaveIcon />
-                </IconButton>
-              </ListItem>
-            ))}
-          </List>
-          <Button
-            variant="contained"
-            color="primary"
-            fullWidth
-            onClick={() => {
-              saveGraph();
-              setSaveDialogOpen(false);
-            }}
-          >
-            Save
-          </Button>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={loadDialogOpen} onClose={() => setLoadDialogOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Load File</DialogTitle>
-        <DialogContent>
-          <List>
-            {savedGraphs.map((graph) => (
-              <ListItem key={graph.name} component="div" onClick={() => setSelectedGraphName(graph.name)} style={{ cursor: 'pointer' }}>
-                <ListItemText primary={graph.name} />
-              </ListItem>
-            ))}
-          </List>
-          <TextField
-            label="Selected File"
-            variant="outlined"
-            fullWidth
-            value={selectedGraphName}
-            onChange={(e) => setSelectedGraphName(e.target.value)}
-            sx={{ mt: 2, mb: 2 }}
-          />
-          <Button
-            variant="contained"
-            color="primary"
-            fullWidth
-            onClick={() => {
-              loadGraph(selectedGraphName);
-              setLoadDialogOpen(false);
-            }}
-          >
-            Load
-          </Button>
-        </DialogContent>
-      </Dialog>
+
+      {/* Modals */}
+      <SaveModal
+        open={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        savedGraphs={savedGraphs}
+        currentName={activeGraphTitle}
+        onSave={handleSave}
+        onDelete={handleDeleteGraph}
+      />
+
+      <LoadModal
+        open={loadModalOpen}
+        onClose={() => setLoadModalOpen(false)}
+        savedGraphs={savedGraphs}
+        onLoad={handleLoad}
+        onDelete={handleDeleteGraph}
+      />
+
+      <ExportModal
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        agentsYaml={agentsYaml}
+        tasksYaml={tasksYaml}
+        pythonCode={pythonCode}
+        mode={exportMode}
+      />
+
+      <CrewSettingsModal
+        open={crewSettingsOpen}
+        onClose={() => setCrewSettingsOpen(false)}
+        settings={crewSettings}
+        onUpdate={setCrewSettings}
+      />
+
+      <ConfirmModal
+        open={confirmModal.open}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, open: false }))}
+      />
     </Box>
   );
 }
 
-// Apply dark theme styles
-const darkTheme = {
-  palette: {
-    mode: 'dark' as const,
-    background: {
-      default: '#1e1e1e',
-      paper: '#2e2e2e',
-    },
-    text: {
-      primary: '#ffffff',
-    },
-  },
-};
-
 function App() {
   return (
-    <ThemeProvider theme={createTheme(darkTheme)}>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
       <ReactFlowProvider>
         <Flow />

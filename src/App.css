@@ -10,3 +10,94 @@ body, html, #root {
   height: 100%;
   width: 100%;
 }
+
+/* ReactFlow overrides */
+.react-flow__node {
+  cursor: pointer;
+}
+
+.react-flow__node.selected {
+  z-index: 10 !important;
+}
+
+.react-flow__edge {
+  cursor: pointer;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3;
+}
+
+.react-flow__controls {
+  bottom: 16px;
+  left: 16px;
+}
+
+.react-flow__controls button {
+  background-color: #1E293B;
+  border: none;
+  color: #94A3B8;
+  width: 28px;
+  height: 28px;
+}
+
+.react-flow__controls button:hover {
+  background-color: #334155;
+  color: #F1F5F9;
+}
+
+.react-flow__controls button svg {
+  fill: currentColor;
+}
+
+.react-flow__minimap {
+  bottom: 16px;
+  right: 16px;
+}
+
+.react-flow__handle {
+  transition: all 0.15s ease;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.3);
+}
+
+/* Connection line styling */
+.react-flow__connection-line {
+  stroke: #94A3B8;
+  stroke-width: 2;
+}
+
+/* Panel background */
+.react-flow__panel {
+  margin: 0;
+}
+
+/* MiniMap */
+.react-flow__minimap-mask {
+  fill: rgba(15, 23, 42, 0.85);
+}
+
+/* Attribution hide */
+.react-flow__attribution {
+  display: none;
+}
+
+/* Animation for node appearance */
+@keyframes nodeAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.react-flow__node-agent,
+.react-flow__node-task,
+.react-flow__node-begin {
+  animation: nodeAppear 0.2s ease-out;
+}
