@@ -40,6 +40,8 @@ import ExportModal from './components/modals/ExportModal';
 import SaveModal from './components/modals/SaveModal';
 import LoadModal from './components/modals/LoadModal';
 import CrewSettingsModal from './components/modals/CrewSettingsModal';
+import { WelcomeScreen, TemplateModal } from './components/TemplateGallery';
+import { CrewTemplate } from './utils/templates';
 import './App.css';
 
 const getId = () => `node_${uuidv4()}`;
@@ -67,6 +69,7 @@ function Flow() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportMode, setExportMode] = useState<'yaml' | 'python'>('yaml');
   const [crewSettingsOpen, setCrewSettingsOpen] = useState(false);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
     title: string;
@@ -403,6 +406,31 @@ function Flow() {
     });
   }, [nodes, edges, clearHistory]);
 
+  const applyTemplate = useCallback((template: CrewTemplate) => {
+    const apply = () => {
+      const { nodes: tNodes, edges: tEdges, crewSettings: tSettings } = template.build();
+      setNodes(tNodes);
+      setEdges(tEdges);
+      setCrewSettings(tSettings);
+      setActiveGraphTitle(tSettings.name);
+      setSelectedNodeId(null);
+      clearHistory();
+      setConfirmModal(prev => ({ ...prev, open: false }));
+    };
+
+    if (nodes.length > 0) {
+      setConfirmModal({
+        open: true,
+        title: 'Load Template',
+        message: `This will replace the current canvas with the "${template.name}" template. Any unsaved changes will be lost.`,
+        variant: 'warning',
+        onConfirm: apply,
+      });
+    } else {
+      apply();
+    }
+  }, [nodes, clearHistory]);
+
   const handleSave = useCallback((name: string) => {
     const newGraph: SavedGraph = {
       name,
@@ -514,6 +542,7 @@ function Flow() {
         onSaveSelectedNode={handleSaveSelectedNode}
         hasSelectedNode={!!selectedNode && (selectedNode.type === 'agent' || selectedNode.type === 'task')}
         onDuplicate={handleDuplicate}
+        onTemplates={() => setTemplateModalOpen(true)}
       />
 
       <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
@@ -575,6 +604,9 @@ function Flow() {
               }}
             />
           </ReactFlow>
+          {nodes.length === 0 && (
+            <WelcomeScreen onSelectTemplate={applyTemplate} />
+          )}
         </Box>
 
         <PropertiesPanel
@@ -618,6 +650,12 @@ function Flow() {
         onClose={() => setCrewSettingsOpen(false)}
         settings={crewSettings}
         onUpdate={setCrewSettings}
+      />
+
+      <TemplateModal
+        open={templateModalOpen}
+        onClose={() => setTemplateModalOpen(false)}
+        onSelectTemplate={(t) => { setTemplateModalOpen(false); applyTemplate(t); }}
       />
 
       <ConfirmModal

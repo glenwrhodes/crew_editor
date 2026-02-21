@@ -138,23 +138,71 @@ export interface LLMInfo {
 }
 
 export const AVAILABLE_LLMS: LLMInfo[] = [
+  // OpenAI
   { value: 'gpt-4o', label: 'GPT-4o', provider: 'OpenAI' },
   { value: 'gpt-4o-mini', label: 'GPT-4o Mini', provider: 'OpenAI' },
-  { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', provider: 'OpenAI' },
-  { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', provider: 'OpenAI' },
+  { value: 'gpt-4.1', label: 'GPT-4.1', provider: 'OpenAI' },
+  { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini', provider: 'OpenAI' },
+  { value: 'gpt-4.1-nano', label: 'GPT-4.1 Nano', provider: 'OpenAI' },
+  { value: 'gpt-5', label: 'GPT-5', provider: 'OpenAI' },
+  { value: 'gpt-5.1', label: 'GPT-5.1', provider: 'OpenAI' },
+  { value: 'gpt-5.2', label: 'GPT-5.2', provider: 'OpenAI' },
+  { value: 'gpt-5.3', label: 'GPT-5.3', provider: 'OpenAI' },
   { value: 'o1', label: 'o1', provider: 'OpenAI' },
-  { value: 'o1-mini', label: 'o1 Mini', provider: 'OpenAI' },
+  { value: 'o3', label: 'o3', provider: 'OpenAI' },
   { value: 'o3-mini', label: 'o3 Mini', provider: 'OpenAI' },
-  { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
-  { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus', provider: 'Anthropic' },
-  { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet', provider: 'Anthropic' },
-  { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku', provider: 'Anthropic' },
-  { value: 'gemini/gemini-1.5-pro', label: 'Gemini 1.5 Pro', provider: 'Google' },
-  { value: 'gemini/gemini-1.5-flash', label: 'Gemini 1.5 Flash', provider: 'Google' },
-  { value: 'gemini/gemini-pro', label: 'Gemini Pro', provider: 'Google' },
-  { value: 'groq/llama-3.1-70b-versatile', label: 'Llama 3.1 70B', provider: 'Groq' },
+  { value: 'o4-mini', label: 'o4 Mini', provider: 'OpenAI' },
+
+  // OpenAI Codex
+  { value: 'openai/gpt-5.1-codex', label: 'GPT-5.1 Codex', provider: 'OpenAI Codex' },
+  { value: 'openai/gpt-5.2-codex', label: 'GPT-5.2 Codex', provider: 'OpenAI Codex' },
+  { value: 'openai/gpt-5.3-codex', label: 'GPT-5.3 Codex', provider: 'OpenAI Codex' },
+
+  // Anthropic
+  { value: 'anthropic/claude-3.5-haiku', label: 'Claude 3.5 Haiku', provider: 'Anthropic' },
+  { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
+  { value: 'anthropic/claude-3.7-sonnet', label: 'Claude 3.7 Sonnet', provider: 'Anthropic' },
+  { value: 'anthropic/claude-haiku-4', label: 'Claude Haiku 4', provider: 'Anthropic' },
+  { value: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4', provider: 'Anthropic' },
+  { value: 'anthropic/claude-opus-4', label: 'Claude Opus 4', provider: 'Anthropic' },
+
+  // Google Gemini
+  { value: 'gemini/gemini-2.0-flash', label: 'Gemini 2.0 Flash', provider: 'Google' },
+  { value: 'gemini/gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google' },
+  { value: 'gemini/gemini-2.5-pro', label: 'Gemini 2.5 Pro', provider: 'Google' },
+  { value: 'gemini/gemini-3-flash', label: 'Gemini 3 Flash', provider: 'Google' },
+  { value: 'gemini/gemini-3-pro', label: 'Gemini 3 Pro', provider: 'Google' },
+
+  // xAI
+  { value: 'xai/grok-3', label: 'Grok 3', provider: 'xAI' },
+  { value: 'xai/grok-3-fast', label: 'Grok 3 Fast', provider: 'xAI' },
+  { value: 'xai/grok-3-mini', label: 'Grok 3 Mini', provider: 'xAI' },
+  { value: 'xai/grok-4', label: 'Grok 4', provider: 'xAI' },
+  { value: 'xai/grok-4-fast', label: 'Grok 4 Fast', provider: 'xAI' },
+  { value: 'xai/grok-code-fast', label: 'Grok Code Fast', provider: 'xAI' },
+
+  // Mistral
+  { value: 'mistral/mistral-large-latest', label: 'Mistral Large', provider: 'Mistral' },
+  { value: 'mistral/mistral-medium-latest', label: 'Mistral Medium', provider: 'Mistral' },
+  { value: 'mistral/mistral-small-latest', label: 'Mistral Small', provider: 'Mistral' },
+  { value: 'mistral/codestral-latest', label: 'Codestral', provider: 'Mistral' },
+  { value: 'mistral/devstral-latest', label: 'Devstral', provider: 'Mistral' },
+  { value: 'mistral/ministral-8b-latest', label: 'Ministral 8B', provider: 'Mistral' },
+  { value: 'mistral/pixtral-large-latest', label: 'Pixtral Large', provider: 'Mistral' },
+
+  // Groq (fast inference)
+  { value: 'groq/llama-3.3-70b-versatile', label: 'Llama 3.3 70B', provider: 'Groq' },
   { value: 'groq/llama-3.1-8b-instant', label: 'Llama 3.1 8B', provider: 'Groq' },
-  { value: 'groq/mixtral-8x7b-32768', label: 'Mixtral 8x7B', provider: 'Groq' },
+  { value: 'groq/deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 70B', provider: 'Groq' },
+  { value: 'groq/qwen-qwq-32b', label: 'Qwen QwQ 32B', provider: 'Groq' },
+  { value: 'groq/kimi-k2', label: 'Kimi K2', provider: 'Groq' },
+
+  // OpenRouter (100+ models via one key)
+  { value: 'openrouter/auto', label: 'Auto (best match)', provider: 'OpenRouter' },
+  { value: 'openrouter/openai/gpt-5', label: 'GPT-5 via Router', provider: 'OpenRouter' },
+  { value: 'openrouter/anthropic/claude-sonnet-4', label: 'Claude Sonnet 4 via Router', provider: 'OpenRouter' },
+  { value: 'openrouter/google/gemini-2.5-pro', label: 'Gemini 2.5 Pro via Router', provider: 'OpenRouter' },
+  { value: 'openrouter/meta-llama/llama-3.3-70b', label: 'Llama 3.3 70B via Router', provider: 'OpenRouter' },
 ];
 
 export function migrateNodeData(node: Node): Node {

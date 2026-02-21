@@ -14,6 +14,7 @@ import CodeIcon from '@mui/icons-material/Code';
 import DataObjectIcon from '@mui/icons-material/DataObject';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import { COLORS } from '../theme';
 
 interface ToolbarProps {
@@ -32,6 +33,7 @@ interface ToolbarProps {
   onSaveSelectedNode: () => void;
   hasSelectedNode: boolean;
   onDuplicate: () => void;
+  onTemplates: () => void;
 }
 
 export default function Toolbar({
@@ -50,6 +52,7 @@ export default function Toolbar({
   onSaveSelectedNode,
   hasSelectedNode,
   onDuplicate,
+  onTemplates,
 }: ToolbarProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [exportAnchor, setExportAnchor] = useState<null | HTMLElement>(null);
@@ -259,6 +262,16 @@ export default function Toolbar({
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
       {/* File ops */}
+      <Tooltip title="Templates">
+        <IconButton
+          size="small"
+          onClick={onTemplates}
+          aria-label="Browse crew templates"
+          sx={{ color: COLORS.text.secondary }}
+        >
+          <DashboardIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+      </Tooltip>
       <Tooltip title="New crew">
         <IconButton
           size="small"
