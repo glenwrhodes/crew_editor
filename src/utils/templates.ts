@@ -60,7 +60,7 @@ function buildResearchTeam() {
     agentNode(a1, 300, 30, {
       name: 'Senior_Researcher',
       role: 'Senior Research Analyst',
-      goal: 'Conduct thorough, multi-source research and uncover comprehensive insights on any assigned topic',
+      goal: 'Conduct thorough, multi-source research and uncover comprehensive insights on {topic}',
       backstory: 'You are a seasoned research analyst with 15 years of experience across technology, business, and science domains. You are known for your meticulous attention to detail and your ability to find information that others miss. You cross-reference multiple authoritative sources and always verify claims before including them in your work.',
       tools: ['SerperDevTool', 'ScrapeWebsiteTool', 'WebsiteSearchTool'],
       llm: 'gpt-4o',
@@ -90,7 +90,7 @@ function buildResearchTeam() {
 
     taskNode(t1, 300, 260, {
       name: 'conduct_research',
-      description: 'Conduct comprehensive research on the given topic. Gather information from multiple authoritative sources including academic papers, industry reports, news articles, and expert opinions. Focus on recent developments within the last 12 months, key statistics, and diverse perspectives. Verify all facts against at least two independent sources.',
+      description: 'Conduct comprehensive research on {topic}. Gather information from multiple authoritative sources including academic papers, industry reports, news articles, and expert opinions. Focus on recent developments within the last 12 months, key statistics, and diverse perspectives. Verify all facts against at least two independent sources.',
       expected_output: 'A detailed research brief with: key findings organized by theme, supporting data and statistics, source citations for every claim, a summary of different perspectives, and identification of any knowledge gaps or conflicting information.',
     }),
     taskNode(t2, 620, 260, {
@@ -100,7 +100,7 @@ function buildResearchTeam() {
     }),
     taskNode(t3, 940, 260, {
       name: 'write_final_report',
-      description: 'Compile all research and analysis into a polished, comprehensive report. Structure it with an executive summary, methodology overview, detailed findings organized by theme, analysis section, conclusions, and actionable recommendations. Use clear headings, bullet points for key takeaways, and ensure the tone is professional yet engaging.',
+      description: 'Compile all research and analysis on {topic} into a polished, comprehensive report. Structure it with an executive summary, methodology overview, detailed findings organized by theme, analysis section, conclusions, and actionable recommendations. Use clear headings, bullet points for key takeaways, and ensure the tone is professional yet engaging.',
       expected_output: 'A publication-ready research report in markdown format with: executive summary (1 page), methodology, detailed findings (organized by theme), analysis and insights, conclusions, and 5-10 actionable recommendations with priority levels.',
       output_file: 'research_report.md',
     }),
@@ -111,7 +111,16 @@ function buildResearchTeam() {
     agentEdge(a1, t1), agentEdge(a2, t2), agentEdge(a3, t3),
   ];
 
-  const crewSettings: CrewSettings = { ...DEFAULT_CREW_SETTINGS, name: 'Research & Analysis Team', process: 'sequential', memory: true, verbose: true };
+  const crewSettings: CrewSettings = {
+    ...DEFAULT_CREW_SETTINGS,
+    name: 'Research & Analysis Team',
+    process: 'sequential',
+    memory: true,
+    verbose: true,
+    inputs: [
+      { name: 'topic', description: 'The topic to research', defaultValue: 'AI agents in enterprise automation' },
+    ],
+  };
 
   return { nodes, edges, crewSettings };
 }
@@ -128,7 +137,7 @@ function buildContentPipeline() {
     agentNode(a1, 300, 20, {
       name: 'Content_Strategist',
       role: 'Senior Content Strategist',
-      goal: 'Develop data-driven content strategies that maximize audience engagement and achieve business objectives',
+      goal: 'Develop data-driven content strategies for {target_audience} that maximize audience engagement on {topic}',
       backstory: 'You are a veteran content strategist with over a decade of experience in digital media. You have led content teams at top publications and tech companies, consistently growing audiences by 300%+. You deeply understand SEO, audience psychology, and content-market fit. You always back your content plans with competitive research and audience data.',
       tools: ['SerperDevTool', 'WebsiteSearchTool'],
       llm: 'anthropic/claude-sonnet-4',
@@ -138,7 +147,7 @@ function buildContentPipeline() {
     agentNode(a2, 610, 20, {
       name: 'Content_Writer',
       role: 'Senior Content Writer',
-      goal: 'Produce high-quality, engaging content that resonates with the target audience and drives measurable results',
+      goal: 'Produce high-quality, engaging content about {topic} that resonates with {target_audience} and drives measurable results',
       backstory: 'You are a versatile writer whose work has been featured in major publications and driven millions of pageviews. You adapt your tone and style effortlessly to match any brand voice while maintaining authenticity. You write with clarity, personality, and purpose — every paragraph serves a goal. You excel at long-form articles, blog posts, and thought leadership pieces.',
       tools: ['SerperDevTool', 'WebsiteSearchTool'],
       llm: 'anthropic/claude-sonnet-4',
@@ -168,12 +177,12 @@ function buildContentPipeline() {
 
     taskNode(t1, 300, 260, {
       name: 'plan_content_strategy',
-      description: 'Research the target topic and audience to develop a comprehensive content plan. Analyze top-performing competitor content on this topic. Identify content gaps and unique angles. Define the target audience persona, desired tone, key messages, and optimal content structure. Include keyword opportunities and suggested headlines.',
+      description: 'Research {topic} and the {target_audience} audience to develop a comprehensive content plan. Analyze top-performing competitor content on this topic. Identify content gaps and unique angles. Define the target audience persona, desired tone, key messages, and optimal content structure. Include keyword opportunities and suggested headlines.',
       expected_output: 'A content strategy brief with: target audience persona, 3 headline options, recommended article structure/outline, key messages and talking points, competitive analysis summary, target keywords (primary + secondary), and estimated word count.',
     }),
     taskNode(t2, 610, 260, {
       name: 'write_content',
-      description: 'Write a compelling, well-researched article based on the content strategy. Follow the recommended structure and incorporate the key messages. Use an engaging hook, clear subheadings, and a strong conclusion with a call to action. Include relevant examples, data points, and expert insights. Target the specified word count and maintain consistent tone throughout.',
+      description: 'Write a compelling, well-researched article about {topic} based on the content strategy. Follow the recommended structure and incorporate the key messages. Use an engaging hook, clear subheadings, and a strong conclusion with a call to action. Include relevant examples, data points, and expert insights. Target the specified word count and maintain consistent tone throughout.',
       expected_output: 'A complete article draft in markdown format with: engaging headline, compelling introduction with hook, well-structured body with subheadings, relevant examples and data, clear conclusion with call to action, and suggested meta description.',
     }),
     taskNode(t3, 920, 260, {
@@ -194,7 +203,17 @@ function buildContentPipeline() {
     agentEdge(a1, t1), agentEdge(a2, t2), agentEdge(a3, t3), agentEdge(a4, t4),
   ];
 
-  const crewSettings: CrewSettings = { ...DEFAULT_CREW_SETTINGS, name: 'Content Production Pipeline', process: 'sequential', memory: true, verbose: true };
+  const crewSettings: CrewSettings = {
+    ...DEFAULT_CREW_SETTINGS,
+    name: 'Content Production Pipeline',
+    process: 'sequential',
+    memory: true,
+    verbose: true,
+    inputs: [
+      { name: 'topic', description: 'The subject of the content piece', defaultValue: 'The future of remote work in 2026' },
+      { name: 'target_audience', description: 'Who the content is written for', defaultValue: 'tech professionals and startup founders' },
+    ],
+  };
 
   return { nodes, edges, crewSettings };
 }
@@ -211,7 +230,7 @@ function buildMarketingCampaign() {
     agentNode(a1, 300, 20, {
       name: 'Market_Researcher',
       role: 'Market Research & Competitive Intelligence Analyst',
-      goal: 'Uncover deep market insights, audience behaviors, and competitive dynamics that inform winning campaign strategies',
+      goal: 'Uncover deep market insights about {product} for {target_audience}, analyzing audience behaviors and competitive dynamics',
       backstory: 'You are a market research specialist with 12 years of experience analyzing consumer behavior and competitive landscapes. You have conducted research for brands like Nike, Airbnb, and Stripe. You combine quantitative data analysis with qualitative insight gathering to paint a complete picture of any market. Your research has directly contributed to campaigns that generated over $100M in revenue.',
       tools: ['SerperDevTool', 'ScrapeWebsiteTool', 'WebsiteSearchTool'],
       llm: 'gpt-4o',
@@ -221,7 +240,7 @@ function buildMarketingCampaign() {
     agentNode(a2, 610, 20, {
       name: 'Creative_Director',
       role: 'Creative Director & Campaign Strategist',
-      goal: 'Develop innovative, memorable campaign concepts that cut through the noise and drive measurable business results',
+      goal: 'Develop innovative, memorable campaign concepts for {product} that cut through the noise and drive measurable results',
       backstory: 'You are a Creative Director with 15 years in advertising and brand strategy. You have led award-winning campaigns at agencies and in-house teams, winning multiple Cannes Lions and Effie Awards. You think in big ideas but always ground creativity in strategy. You understand that great campaigns balance emotional resonance with clear business objectives.',
       tools: ['SerperDevTool'],
       llm: 'anthropic/claude-sonnet-4',
@@ -231,7 +250,7 @@ function buildMarketingCampaign() {
     agentNode(a3, 920, 20, {
       name: 'Copywriter',
       role: 'Senior Marketing Copywriter',
-      goal: 'Craft persuasive, on-brand marketing copy that converts across all channels and touchpoints',
+      goal: 'Craft persuasive marketing copy for {product} targeting {target_audience} that converts across all channels',
       backstory: 'You are a direct-response copywriter with a talent for brand storytelling. You have written copy for product launches, email campaigns, landing pages, social media, and ad creatives that have generated millions in conversions. You understand persuasion psychology and know how to adapt your voice for different channels while maintaining brand consistency. Every word you write has a purpose.',
       tools: [],
       llm: 'anthropic/claude-sonnet-4',
@@ -251,12 +270,12 @@ function buildMarketingCampaign() {
 
     taskNode(t1, 300, 260, {
       name: 'market_analysis',
-      description: 'Conduct thorough market and competitive analysis for the campaign. Research the target audience demographics, psychographics, and behaviors. Analyze competitor campaigns — what worked, what didn\'t, and why. Identify market trends, seasonal opportunities, and whitespace. Summarize audience pain points and motivations that the campaign should address.',
+      description: 'Conduct thorough market and competitive analysis for {product}. Research {target_audience} demographics, psychographics, and behaviors. Analyze competitor campaigns — what worked, what didn\'t, and why. Identify market trends, seasonal opportunities, and whitespace. Summarize audience pain points and motivations that the campaign should address.',
       expected_output: 'A market analysis report with: target audience personas (2-3), competitive landscape overview with SWOT, market trends and opportunities, audience pain points and motivations, channel preferences of the target audience, and 3-5 strategic insights to guide the campaign.',
     }),
     taskNode(t2, 610, 260, {
       name: 'campaign_strategy',
-      description: 'Develop a comprehensive campaign strategy based on the market research. Define the campaign concept/big idea, core messaging framework, channel strategy, content pillars, and timeline. Ensure the strategy addresses audience pain points, differentiates from competitors, and has a clear path to conversion. Include both brand awareness and performance marketing elements.',
+      description: 'Develop a comprehensive campaign strategy for {product} based on the market research. Define the campaign concept/big idea, core messaging framework, channel strategy, content pillars, and timeline. Ensure the strategy addresses {target_audience} pain points, differentiates from competitors, and has a clear path to conversion. Include both brand awareness and performance marketing elements.',
       expected_output: 'A complete campaign strategy document with: campaign concept/big idea, messaging hierarchy (headline, subheads, proof points), channel mix and rationale, content calendar overview, target KPIs by channel, budget allocation recommendations, and risk mitigation strategies.',
     }),
     taskNode(t3, 920, 260, {
@@ -278,7 +297,17 @@ function buildMarketingCampaign() {
     agentEdge(a1, t1), agentEdge(a2, t2), agentEdge(a3, t3), agentEdge(a4, t4),
   ];
 
-  const crewSettings: CrewSettings = { ...DEFAULT_CREW_SETTINGS, name: 'Marketing Campaign Team', process: 'sequential', memory: true, verbose: true };
+  const crewSettings: CrewSettings = {
+    ...DEFAULT_CREW_SETTINGS,
+    name: 'Marketing Campaign Team',
+    process: 'sequential',
+    memory: true,
+    verbose: true,
+    inputs: [
+      { name: 'product', description: 'The product or service to market', defaultValue: 'AI-powered project management tool' },
+      { name: 'target_audience', description: 'The target market segment', defaultValue: 'mid-market SaaS companies with 50-500 employees' },
+    ],
+  };
 
   return { nodes, edges, crewSettings };
 }
@@ -295,7 +324,7 @@ function buildSoftwareDevTeam() {
     agentNode(a1, 300, 20, {
       name: 'Product_Manager',
       role: 'Senior Product Manager & Requirements Analyst',
-      goal: 'Define clear, comprehensive product requirements and user stories that enable the development team to build the right solution efficiently',
+      goal: 'Define clear, comprehensive product requirements for {project_brief} using {tech_stack}, enabling the team to build the right solution efficiently',
       backstory: 'You are a product manager with 10 years of experience shipping software products at startups and enterprise companies. You excel at translating business needs into technical requirements. You think in terms of user outcomes, edge cases, and acceptance criteria. You have a strong technical background that helps you communicate effectively with engineering teams and anticipate implementation challenges.',
       tools: ['SerperDevTool', 'FileWriteTool'],
       llm: 'anthropic/claude-sonnet-4',
@@ -305,7 +334,7 @@ function buildSoftwareDevTeam() {
     agentNode(a2, 610, 20, {
       name: 'Senior_Developer',
       role: 'Senior Software Engineer',
-      goal: 'Design and implement clean, efficient, well-tested code that meets requirements and follows best practices',
+      goal: 'Design and implement a clean, efficient solution for {project_brief} in {tech_stack} that meets requirements and follows best practices',
       backstory: 'You are a senior software engineer with 12 years of experience across backend, frontend, and infrastructure. You have contributed to open-source projects and led architecture decisions at high-scale companies. You write code that is clean, well-documented, and maintainable. You follow SOLID principles, write comprehensive tests, and always consider performance, security, and scalability in your implementations.',
       tools: ['CodeInterpreterTool', 'FileReadTool', 'FileWriteTool', 'CodeDocsSearchTool'],
       llm: 'anthropic/claude-sonnet-4',
@@ -336,13 +365,13 @@ function buildSoftwareDevTeam() {
 
     taskNode(t1, 300, 260, {
       name: 'define_requirements',
-      description: 'Analyze the project brief and create detailed technical requirements. Break the work into user stories with clear acceptance criteria. Define the data model, API contracts, and system architecture at a high level. Identify technical risks, dependencies, and assumptions. Prioritize features using MoSCoW (Must/Should/Could/Won\'t) and estimate complexity for each user story.',
+      description: 'Analyze the following project brief: {project_brief}. The tech stack is {tech_stack}. Create detailed technical requirements. Break the work into user stories with clear acceptance criteria. Define the data model, API contracts, and system architecture at a high level. Identify technical risks, dependencies, and assumptions. Prioritize features using MoSCoW (Must/Should/Could/Won\'t) and estimate complexity for each user story.',
       expected_output: 'A product requirements document (PRD) with: problem statement, user stories with acceptance criteria, data model diagram description, API endpoint specifications, architecture overview, technical risks and mitigations, MoSCoW prioritization, and complexity estimates.',
       output_file: 'requirements.md',
     }),
     taskNode(t2, 610, 260, {
       name: 'implement_solution',
-      description: 'Implement the solution based on the requirements document. Write clean, well-structured code following language best practices and SOLID principles. Include comprehensive docstrings and inline comments for complex logic. Write unit tests for all business logic with >80% coverage target. Handle error cases gracefully. Consider performance and security throughout.',
+      description: 'Implement the solution using {tech_stack} based on the requirements document. Write clean, well-structured code following language best practices and SOLID principles. Include comprehensive docstrings and inline comments for complex logic. Write unit tests for all business logic with >80% coverage target. Handle error cases gracefully. Consider performance and security throughout.',
       expected_output: 'Complete implementation code with: well-structured source code, unit tests with good coverage, clear documentation and docstrings, error handling for edge cases, and a brief implementation notes document explaining key design decisions.',
       output_file: 'implementation.md',
     }),
@@ -365,7 +394,18 @@ function buildSoftwareDevTeam() {
     agentEdge(a1, t1), agentEdge(a2, t2), agentEdge(a3, t3), agentEdge(a4, t4),
   ];
 
-  const crewSettings: CrewSettings = { ...DEFAULT_CREW_SETTINGS, name: 'Software Development Team', process: 'sequential', memory: true, verbose: true, cache: true };
+  const crewSettings: CrewSettings = {
+    ...DEFAULT_CREW_SETTINGS,
+    name: 'Software Development Team',
+    process: 'sequential',
+    memory: true,
+    verbose: true,
+    cache: true,
+    inputs: [
+      { name: 'project_brief', description: 'Description of what to build', defaultValue: 'A REST API for a task management app with user auth, projects, and task CRUD' },
+      { name: 'tech_stack', description: 'Technologies to use', defaultValue: 'Python with FastAPI, PostgreSQL, and SQLAlchemy' },
+    ],
+  };
 
   return { nodes, edges, crewSettings };
 }

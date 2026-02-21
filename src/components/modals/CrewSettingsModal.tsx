@@ -5,7 +5,10 @@ import {
   Divider, Collapse,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { CrewSettings, AVAILABLE_LLMS } from '../../types';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import InputIcon from '@mui/icons-material/Input';
+import { CrewSettings, CrewInput, AVAILABLE_LLMS } from '../../types';
 import { COLORS } from '../../theme';
 
 interface CrewSettingsModalProps {
@@ -102,6 +105,118 @@ export default function CrewSettingsModal({
               </Select>
             </FormControl>
           </Collapse>
+
+          <Divider />
+
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <InputIcon sx={{ fontSize: 14, color: COLORS.text.muted }} />
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: COLORS.text.muted,
+                  fontSize: '0.65rem',
+                }}
+              >
+                Crew Inputs
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+              onClick={() => {
+                const inputs = [...(settings.inputs || []), { name: '', description: '', defaultValue: '' }];
+                handleChange('inputs', inputs);
+              }}
+              aria-label="Add crew input variable"
+              sx={{ fontSize: '0.7rem', textTransform: 'none' }}
+            >
+              Add Input
+            </Button>
+          </Box>
+
+          <Typography variant="caption" sx={{ color: COLORS.text.muted, mt: -1 }}>
+            Define variables like <code style={{ color: COLORS.task.primary }}>{'{topic}'}</code> or <code style={{ color: COLORS.task.primary }}>{'{company}'}</code> that get passed in at runtime via <code>crew.kickoff(inputs={'{...}'})</code>
+          </Typography>
+
+          {(settings.inputs || []).map((input: CrewInput, idx: number) => (
+            <Box
+              key={idx}
+              sx={{
+                p: 1.5,
+                borderRadius: '10px',
+                border: `1px solid ${COLORS.surface.border}50`,
+                bgcolor: `${COLORS.surface.elevated}20`,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="caption" sx={{ color: COLORS.text.muted, fontWeight: 600, fontSize: '0.65rem' }}>
+                  Input #{idx + 1}
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    const inputs = settings.inputs.filter((_: CrewInput, i: number) => i !== idx);
+                    handleChange('inputs', inputs);
+                  }}
+                  aria-label={`Remove input ${input.name || idx + 1}`}
+                  sx={{ color: COLORS.accent.red, p: 0.25 }}
+                >
+                  <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Box>
+              <Stack spacing={1.5}>
+                <TextField
+                  label="Variable Name"
+                  size="small"
+                  fullWidth
+                  value={input.name}
+                  onChange={(e) => {
+                    const sanitized = e.target.value.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+                    const inputs = settings.inputs.map((inp: CrewInput, i: number) =>
+                      i === idx ? { ...inp, name: sanitized } : inp
+                    );
+                    handleChange('inputs', inputs);
+                  }}
+                  placeholder="e.g. topic"
+                  helperText={input.name ? `Use as {${input.name}} in agent/task fields` : 'Letters, numbers, underscores only'}
+                  inputProps={{ 'aria-label': `Input variable name ${idx + 1}` }}
+                  FormHelperTextProps={{ sx: { color: input.name ? COLORS.task.primary : COLORS.text.muted, fontSize: '0.65rem' } }}
+                />
+                <TextField
+                  label="Description"
+                  size="small"
+                  fullWidth
+                  value={input.description}
+                  onChange={(e) => {
+                    const inputs = settings.inputs.map((inp: CrewInput, i: number) =>
+                      i === idx ? { ...inp, description: e.target.value } : inp
+                    );
+                    handleChange('inputs', inputs);
+                  }}
+                  placeholder="What this input is for"
+                  inputProps={{ 'aria-label': `Input description ${idx + 1}` }}
+                />
+                <TextField
+                  label="Default Value (optional)"
+                  size="small"
+                  fullWidth
+                  value={input.defaultValue}
+                  onChange={(e) => {
+                    const inputs = settings.inputs.map((inp: CrewInput, i: number) =>
+                      i === idx ? { ...inp, defaultValue: e.target.value } : inp
+                    );
+                    handleChange('inputs', inputs);
+                  }}
+                  placeholder="e.g. Artificial Intelligence"
+                  inputProps={{ 'aria-label': `Input default value ${idx + 1}` }}
+                />
+              </Stack>
+            </Box>
+          ))}
 
           <Divider />
 

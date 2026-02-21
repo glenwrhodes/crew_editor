@@ -124,6 +124,18 @@ export function generatePythonCode(nodes: Node[], edges: Edge[], crewSettings: C
     : '';
 
   const className = crewSettings.name?.replace(/\s+/g, '') || 'GeneratedCrew';
+  const inputs = crewSettings.inputs?.filter(i => i.name) || [];
+  const hasInputs = inputs.length > 0;
+
+  const kickoffExample = hasInputs
+    ? `
+
+
+# ─── Usage ────────────────────────────────────────────────────────────────────
+# ${className}().crew().kickoff(inputs={
+${inputs.map(i => `#     '${i.name}': '${i.defaultValue || `<${i.description || i.name}>`}'`).join(',\n')}
+# })`
+    : '';
 
   return `"""${crewSettings.name || 'Generated Crew'} - Built with CrewAI Visual Editor"""
 
@@ -151,7 +163,7 @@ ${tasksCode}
             verbose=${crewSettings.verbose ? 'True' : 'False'},
             memory=${crewSettings.memory ? 'True' : 'False'},
             cache=${crewSettings.cache ? 'True' : 'False'}${managerLlm}${planningCode}
-        )`;
+        )${kickoffExample}`;
 }
 
 function getTaskOrder(nodes: Node[], edges: Edge[]): string[] {

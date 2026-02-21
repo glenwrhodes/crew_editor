@@ -38,6 +38,13 @@ export interface CrewSettings {
   fullOutput: boolean;
   planning: boolean;
   plannerLlm: string;
+  inputs: CrewInput[];
+}
+
+export interface CrewInput {
+  name: string;
+  description: string;
+  defaultValue: string;
 }
 
 export interface SavedGraph {
@@ -95,6 +102,7 @@ export const DEFAULT_CREW_SETTINGS: CrewSettings = {
   fullOutput: false,
   planning: false,
   plannerLlm: '',
+  inputs: [],
 };
 
 export interface ToolInfo {
